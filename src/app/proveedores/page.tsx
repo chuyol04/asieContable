@@ -1,0 +1,27 @@
+import Link from "next/link";
+
+import { getActiveCompanyId } from "@/features/company-context/service";
+import { setSupplierStatusAction } from "@/features/suppliers/actions";
+import { listSuppliers } from "@/features/suppliers/service";
+import { parseSupplierStatus } from "@/features/suppliers/validation";
+
+export const dynamic = "force-dynamic";
+const inputClass = "mt-2 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900";
+
+export default async function SuppliersPage({ searchParams }: PageProps<"/proveedores">) {
+  const query = await searchParams;
+  const companyId = await getActiveCompanyId();
+  const search = typeof query.search === "string" ? query.search.trim().slice(0, 255) : "";
+  const status = parseSupplierStatus(query.status);
+  const suppliers = companyId ? await listSuppliers(companyId, search, status) : [];
+  const message = query.message === "created" ? "El proveedor se registró correctamente." : query.message === "updated" ? "El proveedor se actualizó correctamente." : null;
+  return <div><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Compras / Catálogo</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Proveedores</h1><p className="mt-2 text-sm text-slate-500">Guarda los datos fiscales una vez y reutilízalos al crear órdenes.</p></div>{companyId ? <Link className="rounded-lg bg-cyan-600 px-4 py-2.5 text-center text-sm font-semibold text-white" href={`/proveedores/nuevo?companyId=${companyId}`}>+ Nuevo proveedor</Link> : null}</div>
+    {message ? <p className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p> : null}
+    {companyId ? <form className="mt-6 grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-[1.3fr_180px_auto] lg:items-end" method="get"><Field label="Buscar"><input className={inputClass} defaultValue={search} name="search" placeholder="Razón social o RFC" /></Field><Field label="Estado"><select className={inputClass} defaultValue={status} name="status"><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="all">Todos</option></select></Field><button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700" type="submit">Filtrar</button></form> : <p className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Selecciona una empresa activa desde el encabezado.</p>}
+    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">{suppliers.length ? <><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Razón social</th><th className="px-4 py-3">RFC</th><th className="px-4 py-3">Teléfono</th><th className="px-4 py-3">Estado</th><th className="px-5 py-3">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{suppliers.map((supplier) => <tr key={supplier.id}><td className="px-5 py-4 font-semibold text-slate-900">{supplier.legalName}</td><td className="px-4 py-4 text-slate-600">{supplier.taxId ?? "—"}</td><td className="px-4 py-4 text-slate-600">{supplier.phone ?? "—"}</td><td className="px-4 py-4"><Status active={supplier.isActive} /></td><td className="px-5 py-4"><Actions companyId={companyId!} supplier={supplier} /></td></tr>)}</tbody></table></div><div className="divide-y divide-slate-100 md:hidden">{suppliers.map((supplier) => <article className="p-5" key={supplier.id}><div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-900">{supplier.legalName}</h2><p className="mt-1 text-sm text-slate-500">{supplier.taxId ?? "Sin RFC"} · {supplier.phone ?? "Sin teléfono"}</p></div><Status active={supplier.isActive} /></div><div className="mt-4 border-t border-slate-100 pt-4"><Actions companyId={companyId!} supplier={supplier} /></div></article>)}</div></> : <p className="px-6 py-14 text-center text-sm text-slate-500">No hay proveedores que coincidan con los filtros.</p>}</section>
+  </div>;
+}
+
+function Actions({ companyId, supplier }: { companyId: number; supplier: Awaited<ReturnType<typeof listSuppliers>>[number] }) { return <div className="flex flex-wrap gap-2"><Link className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" href={`/proveedores/${supplier.id}/editar?companyId=${companyId}`}>Editar</Link><form action={setSupplierStatusAction}><input name="companyId" type="hidden" value={companyId} /><input name="supplierId" type="hidden" value={supplier.id} /><input name="isActive" type="hidden" value={String(!supplier.isActive)} /><button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" type="submit">{supplier.isActive ? "Desactivar" : "Activar"}</button></form></div>; }
+function Status({ active }: { active: boolean }) { return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{active ? "Activo" : "Inactivo"}</span>; }
+function Field({ children, label }: { children: React.ReactNode; label: string }) { return <label className="text-xs font-semibold text-slate-600">{label}{children}</label>; }

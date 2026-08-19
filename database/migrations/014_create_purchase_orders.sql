@@ -1,0 +1,58 @@
+CREATE TABLE purchase_orders (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_id BIGINT UNSIGNED NOT NULL,
+  order_sequence BIGINT UNSIGNED NOT NULL,
+  order_number VARCHAR(64) NOT NULL,
+  order_date DATE NOT NULL,
+  delivery_date DATE NOT NULL,
+  supplier_legal_name VARCHAR(255) NOT NULL,
+  supplier_tax_id VARCHAR(32) NULL,
+  supplier_address TEXT NULL,
+  supplier_phone VARCHAR(32) NULL,
+  subtotal DECIMAL(15,2) NOT NULL,
+  discount_total DECIMAL(15,2) NOT NULL,
+  tax_total DECIMAL(15,2) NOT NULL,
+  total DECIMAL(15,2) NOT NULL,
+  notes TEXT NULL,
+  status ENUM('draft', 'confirmed', 'cancelled') NOT NULL DEFAULT 'draft',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_purchase_orders_company_number (company_id, order_number),
+  UNIQUE KEY uq_purchase_orders_company_sequence (company_id, order_sequence),
+  KEY idx_purchase_orders_company_date (company_id, order_date),
+  KEY idx_purchase_orders_status (status),
+  CONSTRAINT fk_purchase_orders_company
+    FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE RESTRICT,
+  CONSTRAINT chk_purchase_orders_supplier CHECK (CHAR_LENGTH(TRIM(supplier_legal_name)) > 0),
+  CONSTRAINT chk_purchase_orders_totals CHECK (subtotal >= 0 AND discount_total >= 0 AND tax_total >= 0 AND total >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE purchase_order_items (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  purchase_order_id BIGINT UNSIGNED NOT NULL,
+  product_id BIGINT UNSIGNED NULL,
+  product_reference VARCHAR(100) NULL,
+  product_name VARCHAR(191) NOT NULL,
+  description TEXT NOT NULL,
+  unit VARCHAR(64) NOT NULL,
+  quantity DECIMAL(15,4) NOT NULL,
+  unit_price DECIMAL(15,2) NOT NULL,
+  discount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  tax_rate DECIMAL(5,2) NOT NULL,
+  subtotal DECIMAL(15,2) NOT NULL,
+  tax_amount DECIMAL(15,2) NOT NULL,
+  total DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_purchase_order_items_order (purchase_order_id),
+  KEY idx_purchase_order_items_product (product_id),
+  CONSTRAINT fk_purchase_order_items_order
+    FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_purchase_order_items_product
+    FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL,
+  CONSTRAINT chk_purchase_order_items_name CHECK (CHAR_LENGTH(TRIM(product_name)) > 0),
+  CONSTRAINT chk_purchase_order_items_quantity CHECK (quantity > 0),
+  CONSTRAINT chk_purchase_order_items_amounts CHECK (unit_price >= 0 AND discount >= 0 AND tax_rate >= 0 AND tax_rate <= 100 AND subtotal >= 0 AND tax_amount >= 0 AND total >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

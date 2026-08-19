@@ -1,17 +1,39 @@
 {
-  "name": "asiecontable-scaffold",
+  "name": "asiecontable",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pdf:install-browser": "playwright install chromium",
+    "test:companies": "node --experimental-strip-types --test src/features/companies/validation.test.mjs",
+    "test:banks": "node --experimental-strip-types --test src/features/banks/validation.test.mjs",
+    "test:dossier": "node --experimental-strip-types --test src/features/company-dossier/validation.test.mjs",
+    "test:periods": "node --experimental-strip-types --test src/features/accounting-periods/validation.test.mjs",
+    "test:expected-amounts": "node --experimental-strip-types --test src/features/expected-amounts/money.test.mjs",
+    "test:deposits": "node --experimental-strip-types --test src/features/bank-deposits/validation.test.mjs",
+    "test:reconciliation": "node --experimental-strip-types --test src/features/reconciliation/validation.test.mjs",
+    "test:deliveries": "node --experimental-strip-types --test src/features/cash-deliveries/validation.test.mjs",
+    "test:products": "node --experimental-strip-types --test src/features/products/validation.test.mjs",
+    "test:suppliers": "node --experimental-strip-types --test src/features/suppliers/validation.test.mjs",
+    "test:purchase-order-settings": "node --experimental-strip-types --test src/features/purchase-order-settings/validation.test.mjs",
+    "test:purchase-orders": "node --experimental-strip-types --test src/features/purchase-orders/calculations.test.mjs src/features/purchase-orders/validation.test.mjs",
+    "test:auth": "node --experimental-strip-types --test src/features/auth/security.test.mjs"
   },
   "dependencies": {
+    "@htmldocs/react": "^0.2.30",
+    "@htmldocs/render": "^0.2.30",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "google-auth-library": "^10.9.1",
+    "mysql2": "^3.23.2",
     "next": "16.3.0",
+    "playwright": "^1.62.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "read-excel-file": "^9.3.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

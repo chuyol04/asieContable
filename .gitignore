@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local credentials
+client_secret*.json
+service-account*.json
+firebase-admin*.json
+oauth-token*.json
 
 # vercel
 .vercel
@@ -39,3 +46,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local runtime files
+/storage/signatures/
+/storage/purchase-order-logos/

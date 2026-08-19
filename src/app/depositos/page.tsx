@@ -1,0 +1,47 @@
+import Link from "next/link";
+
+import { listAccountingPeriods } from "@/features/accounting-periods/service";
+import { monthNames } from "@/features/accounting-periods/validation";
+import { listBankAccountOptions, listDepositBatchOptions, listDeposits } from "@/features/bank-deposits/service";
+import type { BankDeposit, DepositStatus } from "@/features/bank-deposits/types";
+import { parseDepositDate, parseDepositId, parseDepositStatus } from "@/features/bank-deposits/validation";
+import { getActiveCompanyId } from "@/features/company-context/service";
+import { moneyToCents } from "@/features/expected-amounts/money";
+
+export const dynamic = "force-dynamic";
+
+const messages: Record<string, string> = { created: "El depósito se registró correctamente.", "multiple-created": "El lote se registró correctamente." };
+const inputClass = "mt-2 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-500 focus:ring-3 focus:ring-cyan-100";
+
+export default async function DepositsPage({ searchParams }: PageProps<"/depositos">) {
+  const query = await searchParams;
+  const companyId = await getActiveCompanyId();
+  const accountingPeriodId = parseDepositId(query.periodId);
+  const bankAccountId = parseDepositId(query.accountId);
+  const depositDate = parseDepositDate(query.date);
+  const status = parseDepositStatus(query.status);
+  const batchId = parseDepositId(query.batchId);
+  const [deposits, periods, accounts, batches] = await Promise.all([
+    companyId ? listDeposits({ companyId, accountingPeriodId, bankAccountId, depositDate, status, batchId }) : [],
+    companyId ? listAccountingPeriods({ search: "", companyId, year: null, status: "all" }) : [],
+    companyId ? listBankAccountOptions(companyId) : [],
+    companyId ? listDepositBatchOptions(companyId) : [],
+  ]);
+  const totalCents = deposits.reduce((sum, deposit) => sum + (moneyToCents(deposit.amount) ?? 0), 0);
+  const batchCount = new Set(deposits.flatMap((deposit) => deposit.batchId ? [deposit.batchId] : [])).size;
+  const message = typeof query.message === "string" ? messages[query.message] : undefined;
+
+  return <>{message ? <p className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p> : null}<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Operación / Depósitos</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Depósitos recibidos</h1><p className="mt-2 text-sm text-slate-500">Movimientos reales recibidos en las cuentas bancarias.</p></div><div className="flex flex-wrap gap-2"><Link className="rounded-lg border border-cyan-600 bg-white px-4 py-2.5 text-center text-sm font-semibold text-cyan-700 hover:bg-cyan-50" href="/depositos/multiples">Registrar lote</Link><Link className="rounded-lg bg-cyan-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-700" href="/depositos/nuevo">+ Registrar depósito</Link></div></div>
+    <section className="mt-6 grid gap-4 sm:grid-cols-3"><Summary label="Total recibido" value={formatCents(totalCents)} /><Summary label="Depósitos registrados" value={String(deposits.length)} /><Summary label="Lotes" value={String(batchCount)} /></section>
+    {!companyId ? <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Selecciona una empresa activa para consultar depósitos.</p> : null}<form className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4" method="get"><Field label="Periodo"><select className={inputClass} defaultValue={accountingPeriodId ?? ""} name="periodId"><option value="">Todos</option>{periods.map((period) => <option key={period.id} value={period.id}>{monthNames[period.month - 1]} {period.year}</option>)}</select></Field><Field label="Cuenta"><select className={inputClass} defaultValue={bankAccountId ?? ""} name="accountId"><option value="">Todas</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.bankName} · {account.alias}</option>)}</select></Field><Field label="Fecha"><input className={inputClass} defaultValue={depositDate ?? ""} name="date" type="date" /></Field><Field label="Estado"><select className={inputClass} defaultValue={status ?? ""} name="status"><option value="">Todos</option><option value="available">Disponible</option><option value="reconciled">Conciliado</option></select></Field><Field label="Lote"><select className={inputClass} defaultValue={batchId ?? ""} name="batchId"><option value="">Todos</option>{batches.map((batch) => <option key={batch.id} value={batch.id}>#{batch.id} · {batch.bankName}/{batch.accountAlias}</option>)}</select></Field><div className="flex items-end gap-2 md:col-span-2"><button className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="submit">Aplicar filtros</button><Link className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50" href="/depositos">Limpiar</Link></div></form>
+    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-semibold text-slate-900">Movimientos</h2></div>{deposits.length ? <><div className="hidden overflow-x-auto xl:block"><table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Fecha</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Banco/cuenta</th><th className="px-4 py-3">Monto</th><th className="px-4 py-3">Referencia</th><th className="px-4 py-3">Lote</th><th className="px-4 py-3">Estado</th><th className="px-5 py-3 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{deposits.map((deposit) => <tr key={deposit.id}><td className="px-5 py-4 text-slate-600">{formatDate(deposit.depositDate)}</td><td className="px-4 py-4 font-semibold text-slate-900">{deposit.companyName}</td><td className="px-4 py-4 text-slate-600">{deposit.bankName} · {deposit.accountAlias}</td><td className="px-4 py-4 font-semibold text-slate-900">{formatMoney(deposit.amount)}</td><td className="px-4 py-4 text-slate-600">{deposit.reference || "—"}</td><td className="px-4 py-4 text-slate-600">{deposit.batchId ? `#${deposit.batchId}` : "Individual"}</td><td className="px-4 py-4"><Status status={deposit.status} /></td><td className="px-5 py-4"><Actions deposit={deposit} /></td></tr>)}</tbody></table></div><div className="divide-y divide-slate-100 xl:hidden">{deposits.map((deposit) => <article className="p-4 sm:p-5" key={deposit.id}><div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-900">{formatMoney(deposit.amount)}</h2><p className="mt-1 text-sm text-slate-500">{deposit.bankName} · {deposit.accountAlias}</p></div><Status status={deposit.status} /></div><p className="mt-3 text-xs text-slate-500">{deposit.companyName} · {formatDate(deposit.depositDate)} · {deposit.reference || "Sin referencia"} · {deposit.batchId ? `Lote #${deposit.batchId}` : "Individual"}</p><div className="mt-4 border-t border-slate-100 pt-4"><Actions deposit={deposit} /></div></article>)}</div></> : <div className="px-6 py-14 text-center"><p className="font-semibold text-slate-800">No hay depósitos registrados.</p><p className="mt-1 text-sm text-slate-500">Ajusta los filtros o registra un movimiento.</p></div>}</section>
+  </>;
+}
+
+function Field({ children, label }: { children: React.ReactNode; label: string }) { return <label className="text-xs font-semibold text-slate-600">{label}{children}</label>; }
+function Summary({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase text-slate-400">{label}</p><p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p></div>; }
+function Status({ status }: { status: DepositStatus }) { return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status === "available" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{status === "available" ? "Disponible" : "Conciliado"}</span>; }
+function Actions({ deposit }: { deposit: BankDeposit }) { return <div className="flex flex-wrap justify-end gap-2"><Link className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" href={`/depositos/${deposit.id}`}>Ver</Link>{deposit.status === "available" ? <Link className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" href={`/depositos/${deposit.id}/editar`}>Editar</Link> : null}</div>; }
+function formatMoney(value: string): string { const [integer, decimals] = value.split("."); return `$${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${decimals}`; }
+function formatCents(cents: number): string { return formatMoney(`${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`); }
+function formatDate(value: string): string { return new Date(`${value}T12:00:00`).toLocaleDateString("es-MX", { dateStyle: "medium" }); }

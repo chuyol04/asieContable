@@ -7,3 +7,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Reglas de ASIEContable
+
+- Trabajar únicamente en la fase solicitada; no adelantar módulos futuros.
+- Mantener un monolito modular con Next.js App Router, TypeScript estricto, Tailwind CSS, MySQL y `mysql2/promise`.
+- No agregar Express, MongoDB, GridFS ni microservicios.
+- Separar componentes visuales, lógica de negocio y acceso a datos.
+- Mantener secretos y configuración fuera del código mediante variables de entorno.
+- No guardar archivos `.env`, credenciales ni secretos en Git.
+- Ejecutar `npm run lint` y `npm run build` al terminar cada tarea.
+- Informar los archivos modificados y las validaciones ejecutadas en cada entrega.
