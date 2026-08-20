@@ -102,6 +102,7 @@ export async function saveDriveAuthorization(code: string): Promise<void> {
   mkdirSync(dirname(config.tokenPath), { recursive: true });
   writeFileSync(config.tokenPath, JSON.stringify({ refresh_token: tokens.refresh_token }, null, 2), { encoding: "utf8", mode: 0o600 });
   authClient = null;
+  rootFolders = null;
 }
 
 export function isDriveConnected(): boolean {
@@ -174,7 +175,12 @@ async function getRootFolders(): Promise<{ documents: string; orders: string }> 
       };
     })();
   }
-  return rootFolders;
+  try {
+    return await rootFolders;
+  } catch (error) {
+    rootFolders = null;
+    throw error;
+  }
 }
 
 export async function ensurePurchaseOrderFolder(companyName: string, orderDate: string): Promise<DriveFolder> {
