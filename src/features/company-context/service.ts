@@ -1,11 +1,13 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 import { listCompanies } from "@/features/companies/service";
 
 export const ACTIVE_COMPANY_COOKIE = "asie_active_company";
 
 export const getCompanyContext = cache(async () => {
+  await connection();
   const companies = await listCompanies("", "active");
   const cookieId = Number((await cookies()).get(ACTIVE_COMPANY_COOKIE)?.value);
   const selected = Number.isSafeInteger(cookieId) && cookieId > 0 ? companies.find((company) => company.id === cookieId) ?? null : null;

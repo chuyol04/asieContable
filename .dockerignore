@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+.env*
+storage
+*.pem
+client_secret*.json
+service-account*.json
+firebase-admin*.json
+oauth-token*.json
+npm-debug.log*
