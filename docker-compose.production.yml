@@ -17,6 +17,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      APP_DOMAIN: ${APP_DOMAIN}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_credentials
       GOOGLE_DRIVE_OAUTH_CREDENTIALS_PATH: /run/secrets/google_drive_oauth

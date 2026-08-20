@@ -1,7 +1,9 @@
-export function isTrustedOrigin(origin: string | null, expectedOrigin: string): boolean {
+export function isTrustedOrigin(origin: string | null, expectedOrigins: string | readonly string[]): boolean {
   if (!origin) return false;
   try {
-    return new URL(origin).origin === expectedOrigin;
+    const normalizedOrigin = new URL(origin).origin;
+    const allowedOrigins = typeof expectedOrigins === "string" ? [expectedOrigins] : expectedOrigins;
+    return allowedOrigins.includes(normalizedOrigin);
   } catch {
     return false;
   }

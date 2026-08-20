@@ -5,6 +5,7 @@ import { isTrustedOrigin, safeInternalPath } from "./security.ts";
 
 test("solo acepta solicitudes del mismo origen", () => {
   assert.equal(isTrustedOrigin("http://localhost:3001", "http://localhost:3001"), true);
+  assert.equal(isTrustedOrigin("https://phantocontable.systems", ["https://phantocontable.systems", "https://www.phantocontable.systems"]), true);
   assert.equal(isTrustedOrigin("https://otro-sitio.example", "http://localhost:3001"), false);
   assert.equal(isTrustedOrigin("no-es-url", "http://localhost:3001"), false);
 });

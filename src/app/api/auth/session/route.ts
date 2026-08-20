@@ -5,7 +5,11 @@ import { isTrustedOrigin } from "@/features/auth/security";
 import { SESSION_COOKIE, SESSION_DURATION_SECONDS } from "@/features/auth/session";
 
 export async function POST(request: NextRequest) {
-  if (!isTrustedOrigin(request.headers.get("origin"), request.nextUrl.origin)) return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
+  const appDomain = process.env.APP_DOMAIN?.trim().toLowerCase();
+  const trustedOrigins = appDomain
+    ? [`https://${appDomain}`, `https://www.${appDomain}`]
+    : request.nextUrl.origin;
+  if (!isTrustedOrigin(request.headers.get("origin"), trustedOrigins)) return NextResponse.json({ error: "Origen no permitido." }, { status: 403 });
   try {
     const { idToken } = await request.json() as { idToken?: unknown };
     if (typeof idToken !== "string" || idToken.length > 10_000) return NextResponse.json({ error: "Solicitud inválida." }, { status: 400 });
