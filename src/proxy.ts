@@ -11,8 +11,14 @@ export async function proxy(request: NextRequest) {
   if (!session) return publicPaths.has(request.nextUrl.pathname) ? NextResponse.next() : NextResponse.redirect(new URL("/login", request.url));
 
   try {
-    await firebaseAdminAuth.verifySessionCookie(session, true);
-    return isLogin ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next();
+    const user = await firebaseAdminAuth.verifySessionCookie(session, true);
+    const clientArea = request.nextUrl.pathname === "/mis-nominas" || request.nextUrl.pathname.startsWith("/mis-nominas/");
+    if (user.role === "client") {
+      if (isLogin || (!clientArea && !publicPaths.has(request.nextUrl.pathname))) return NextResponse.redirect(new URL("/mis-nominas", request.url));
+      return NextResponse.next();
+    }
+    if (clientArea || isLogin) return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.next();
   } catch {
     const response = publicPaths.has(request.nextUrl.pathname) ? NextResponse.next() : NextResponse.redirect(new URL("/login", request.url));
     response.cookies.delete(SESSION_COOKIE);

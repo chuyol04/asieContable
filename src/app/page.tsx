@@ -38,6 +38,7 @@ export default async function Home() {
           </div>
           <div className="divide-y divide-slate-100">
             <ModuleLink code="EM" description="Datos generales, representantes, documentos y cuentas bancarias." href="/empresas" name="Expedientes de empresas" />
+            <ModuleLink code="CN" description="Usuarios clientes y archivos privados de nómina en Google Drive." href="/clientes" name="Clientes y nóminas" />
             <ModuleLink code="PM" description="Periodos mensuales por empresa y control de estado." href="/periodos" name="Periodos mensuales" />
             <ModuleLink code="DP" description="Captura individual y múltiple de movimientos recibidos." href="/depositos" name="Depósitos recibidos" />
             <ModuleLink code="CO" description="Coincidencias exactas, similares y conciliación manual por periodo." href="/conciliacion" name="Conciliación" />

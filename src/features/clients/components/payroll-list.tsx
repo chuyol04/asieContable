@@ -1,0 +1,22 @@
+import { driveFileDownloadUrl } from "@/features/purchase-orders/google-drive";
+
+import { setPayrollStatusAction } from "../actions";
+import type { PayrollFile } from "../types";
+
+const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+export function PayrollList({ clientId, files, admin = false }: { clientId: number; files: PayrollFile[]; admin?: boolean }) {
+  if (!files.length) return <p className="px-6 py-12 text-center text-sm text-slate-500">No hay archivos de nómina para los filtros seleccionados.</p>;
+  return <>
+    <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Periodo</th><th className="px-4 py-3">Fecha</th><th className="px-4 py-3">Archivo</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Carga</th>{admin ? <th className="px-4 py-3">Estado</th> : null}<th className="px-5 py-3">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{files.map((file) => <tr key={file.id}><td className="px-5 py-4 font-semibold text-slate-900">{months[file.periodMonth - 1]} {file.periodYear}</td><td className="px-4 py-4 text-slate-600">{formatDate(file.payrollDate)}</td><td className="max-w-xs truncate px-4 py-4 text-slate-700">{file.fileName}</td><td className="px-4 py-4 uppercase text-slate-600">{file.fileType}</td><td className="px-4 py-4 text-slate-600">{formatDateTime(file.uploadedAt)}</td>{admin ? <td className="px-4 py-4"><Status active={file.isActive} /></td> : null}<td className="px-5 py-4"><Actions admin={admin} clientId={clientId} file={file} /></td></tr>)}</tbody></table></div>
+    <div className="divide-y divide-slate-100 md:hidden">{files.map((file) => <article className="p-5" key={file.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">{months[file.periodMonth - 1]} {file.periodYear}</p><h3 className="mt-1 truncate font-semibold text-slate-900">{file.fileName}</h3><p className="mt-1 text-sm text-slate-500">{file.fileType.toUpperCase()} · Cargado {formatDateTime(file.uploadedAt)}</p></div>{admin ? <Status active={file.isActive} /> : null}</div><div className="mt-4"><Actions admin={admin} clientId={clientId} file={file} /></div></article>)}</div>
+  </>;
+}
+
+function Actions({ admin, clientId, file }: { admin: boolean; clientId: number; file: PayrollFile }) {
+  return <div className="flex flex-wrap gap-2"><a className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-semibold text-white" href={file.driveUrl} rel="noreferrer" target="_blank">Abrir en Drive</a><a className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" href={driveFileDownloadUrl(file.driveFileId)} rel="noreferrer" target="_blank">Descargar</a>{admin ? <form action={setPayrollStatusAction}><input name="clientId" type="hidden" value={clientId} /><input name="payrollFileId" type="hidden" value={file.id} /><input name="isActive" type="hidden" value={String(!file.isActive)} /><button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" type="submit">{file.isActive ? "Desactivar" : "Activar"}</button></form> : null}</div>;
+}
+
+function Status({ active }: { active: boolean }) { return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{active ? "Activo" : "Inactivo"}</span>; }
+function formatDate(value: string | null): string { return value ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)) : "—"; }
+function formatDateTime(value: Date): string { return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }

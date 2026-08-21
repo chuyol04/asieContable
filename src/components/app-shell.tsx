@@ -3,15 +3,19 @@ import Link from "next/link";
 
 import asieLogo from "../../docs/referencias-ui/AsieDegradado.png";
 import { logoutAction } from "@/features/auth/actions";
+import { requireAdminUser } from "@/features/auth/authorization";
 import { CompanySelector } from "@/features/company-context/components/company-selector";
 import { getCompanyContext } from "@/features/company-context/service";
 
-type ActiveSection = "home" | "companies" | "banks" | "periods" | "deposits" | "reconciliation" | "deliveries" | "purchase-orders" | "suppliers" | "products" | "dashboard";
+type ActiveSection = "home" | "companies" | "clients" | "banks" | "periods" | "deposits" | "reconciliation" | "deliveries" | "purchase-orders" | "suppliers" | "products" | "dashboard";
 interface NavigationItem { id: ActiveSection; href: string; label: string }
 
 const navigationGroups: Array<{ label: string; items: NavigationItem[] }> = [
   { label: "General", items: [{ id: "home" as const, href: "/", label: "Inicio" }] },
-  { label: "Administración", items: [{ id: "companies" as const, href: "/empresas", label: "Empresas" }] },
+  { label: "Administración", items: [
+    { id: "companies" as const, href: "/empresas", label: "Empresas" },
+    { id: "clients" as const, href: "/clientes", label: "Clientes y nóminas" },
+  ] },
   { label: "Proceso contable", items: [
     { id: "periods" as const, href: "/periodos", label: "1. Periodos y Excel" },
     { id: "deposits" as const, href: "/depositos", label: "2. Depósitos bancarios" },
@@ -37,6 +41,7 @@ export async function AppShell({
   title: string;
   children: React.ReactNode;
 }) {
+  await requireAdminUser();
   const { companies, activeCompany } = await getCompanyContext();
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-[#17233c]">

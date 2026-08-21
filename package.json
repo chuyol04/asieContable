@@ -20,7 +20,8 @@
     "test:suppliers": "node --experimental-strip-types --test src/features/suppliers/validation.test.mjs",
     "test:purchase-order-settings": "node --experimental-strip-types --test src/features/purchase-order-settings/validation.test.mjs",
     "test:purchase-orders": "node --experimental-strip-types --test src/features/purchase-orders/calculations.test.mjs src/features/purchase-orders/validation.test.mjs",
-    "test:auth": "node --experimental-strip-types --test src/features/auth/security.test.mjs"
+    "test:auth": "node --experimental-strip-types --test src/features/auth/security.test.mjs",
+    "test:clients": "node --experimental-strip-types --test src/features/clients/validation.test.mjs"
   },
   "dependencies": {
     "@htmldocs/react": "^0.2.30",

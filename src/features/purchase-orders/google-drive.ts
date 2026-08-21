@@ -44,7 +44,7 @@ export class GoogleDriveError extends Error {
 }
 
 let authClient: OAuth2Client | null = null;
-let rootFolders: Promise<{ documents: string; orders: string }> | null = null;
+let rootFolders: Promise<{ documents: string; orders: string; payrolls: string }> | null = null;
 
 function getConfig(): DriveConfig {
   const credentialPath = process.env.GOOGLE_DRIVE_OAUTH_CREDENTIALS_PATH?.trim();
@@ -164,7 +164,7 @@ async function ensureFolder(name: string, parentId: string): Promise<string> {
   return (await findFile(name, parentId, FOLDER_MIME_TYPE) ?? await createFolder(name, parentId)).id;
 }
 
-async function getRootFolders(): Promise<{ documents: string; orders: string }> {
+async function getRootFolders(): Promise<{ documents: string; orders: string; payrolls: string }> {
   const config = getConfig();
   if (!rootFolders) {
     rootFolders = (async () => {
@@ -172,6 +172,7 @@ async function getRootFolders(): Promise<{ documents: string; orders: string }> 
       return {
         orders: config.rootFolderId || await ensureFolder("Ordenes de compra", applicationRoot),
         documents: config.documentsRootFolderId || await ensureFolder("Expedientes", applicationRoot),
+        payrolls: await ensureFolder("Nóminas", applicationRoot),
       };
     })();
   }
@@ -198,6 +199,38 @@ export async function ensureCompanyDocumentFolder(companyName: string, category:
   let parentId = (await getRootFolders()).documents;
   for (const name of names) parentId = await ensureFolder(name, parentId);
   return { id: parentId, path: names.join(" / "), url: `https://drive.google.com/drive/folders/${encodeURIComponent(parentId)}` };
+}
+
+export async function ensurePayrollFolder(clientName: string, year: number, month: number): Promise<DriveFolder & { clientFolderId: string }> {
+  if (!Number.isInteger(year) || year < 2000 || year > 2200 || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw new GoogleDriveError("API", "El periodo de nómina no es válido.");
+  }
+  const root = (await getRootFolders()).payrolls;
+  const clientNameSafe = folderName(clientName);
+  const clientFolderId = await ensureFolder(clientNameSafe, root);
+  const yearFolderId = await ensureFolder(String(year), clientFolderId);
+  const id = await ensureFolder(months[month - 1], yearFolderId);
+  return {
+    id,
+    clientFolderId,
+    path: `${clientNameSafe} / ${year} / ${months[month - 1]}`,
+    url: `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`,
+  };
+}
+
+export async function shareDriveFolderWithUser(folderId: string, email: string): Promise<void> {
+  const safeFolderId = encodeURIComponent(folderId);
+  const current = await requestJson<{ permissions?: Array<{ emailAddress?: string; type?: string; role?: string }> }>(
+    `${API_BASE}/${safeFolderId}/permissions?fields=permissions(emailAddress,type,role)&pageSize=100`,
+  );
+  const normalizedEmail = email.trim().toLowerCase();
+  if (current.permissions?.some((permission) => permission.type === "user" && permission.emailAddress?.toLowerCase() === normalizedEmail && permission.role === "reader")) return;
+  const params = new URLSearchParams({ fields: "id", sendNotificationEmail: "false" });
+  await requestJson(`${API_BASE}/${safeFolderId}/permissions?${params}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "user", role: "reader", emailAddress: normalizedEmail }),
+  });
 }
 
 function multipartBody(metadata: object, data: Uint8Array, filename: string, mimeType: string): FormData {
@@ -243,6 +276,10 @@ export async function deleteDriveFile(fileId: string): Promise<void> {
 
 export function driveFileUrl(file: DriveFile): string {
   return file.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`;
+}
+
+export function driveFileDownloadUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
 }
 
 const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"] as const;
