@@ -5,6 +5,7 @@ import { useActionState, useMemo, useState } from "react";
 import { readSheet } from "read-excel-file/browser";
 
 import type { ProductImportState } from "../types";
+import { parseProductNameCsv } from "../validation";
 
 type ImportAction = (state: ProductImportState, formData: FormData) => Promise<ProductImportState>;
 type Cell = unknown;
@@ -46,7 +47,9 @@ export function ProductExcelImporter({ action }: { action: ImportAction }) {
       return;
     }
     try {
-      const sheet = await readSheet(file, { trim: true });
+      const sheet: Cell[][] = file.name.toLocaleLowerCase("es-MX").endsWith(".csv")
+        ? parseProductNameCsv(await file.text())
+        : await readSheet(file, { trim: true });
       const firstRow = sheet.findIndex((row) => row.some((cell) => cellText(cell) !== ""));
       if (firstRow < 0) throw new Error("EMPTY");
       const sourceHeaders = uniqueHeaders(sheet[firstRow]);
@@ -57,7 +60,7 @@ export function ProductExcelImporter({ action }: { action: ImportAction }) {
       setHeaderRowNumber(firstRow + 1);
       setNameIndex(suggestNameColumn(sourceHeaders));
     } catch {
-      setReadError("No fue posible leer el archivo. Usa un .xlsx con encabezados y máximo 2000 productos.");
+      setReadError("No fue posible leer el archivo. Usa un .xlsx o .csv con encabezados y máximo 2000 productos.");
     }
   }
 
@@ -65,7 +68,8 @@ export function ProductExcelImporter({ action }: { action: ImportAction }) {
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-sm font-semibold text-slate-900">1. Selecciona el Excel</h2>
       <p className="mt-1 text-xs leading-5 text-slate-500">La primera fila debe contener encabezados. Solo necesitas una columna llamada Nombre o Producto. El archivo se procesa en tu navegador y no se almacena.</p>
-      <input accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="mt-4 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-50 file:px-4 file:py-2.5 file:font-semibold file:text-cyan-700" onChange={(event) => void readFile(event.target.files?.[0])} type="file" />
+      <a className="mt-4 inline-flex rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-2.5 text-sm font-semibold text-cyan-700 hover:bg-cyan-100" download href="/plantilla-productos.csv">Descargar plantilla para Excel</a>
+      <input accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="mt-4 block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-50 file:px-4 file:py-2.5 file:font-semibold file:text-cyan-700" onChange={(event) => void readFile(event.target.files?.[0])} type="file" />
     </section>
     {readError ? <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{readError}</p> : null}
 

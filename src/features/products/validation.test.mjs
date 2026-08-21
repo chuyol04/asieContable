@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateProductForm, validateProductImport } from "./validation.ts";
+import { parseProductNameCsv, validateProductForm, validateProductImport } from "./validation.ts";
 
 test("normaliza y valida un producto", () => {
   const form = new FormData();
@@ -39,4 +39,8 @@ test("valida una carga de nombres y elimina duplicados dentro del archivo", () =
 
   form.set("names", JSON.stringify([""]));
   assert.equal(validateProductImport(form).success, false);
+});
+
+test("lee la plantilla CSV de una sola columna", () => {
+  assert.deepEqual(parseProductNameCsv("\uFEFFNombre\r\nBolsa blanca\r\nBolsa negra"), [["Nombre"], ["Bolsa blanca"], ["Bolsa negra"]]);
 });

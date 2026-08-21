@@ -103,3 +103,7 @@ export function validateProductImport(formData: FormData):
   }
   return { success: true, names };
 }
+
+export function parseProductNameCsv(content: string): string[][] {
+  return content.replace(/^\uFEFF/, "").split(/\r?\n/).map((line) => [line.trim()]);
+}
