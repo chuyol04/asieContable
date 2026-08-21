@@ -1,7 +1,6 @@
-import { driveFileDownloadUrl } from "@/features/purchase-orders/google-drive";
-
 import { setPayrollStatusAction } from "../actions";
 import type { PayrollFile } from "../types";
+import { DeletePayrollButton } from "./delete-payroll-button";
 
 const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -14,7 +13,7 @@ export function PayrollList({ clientId, files, admin = false }: { clientId: numb
 }
 
 function Actions({ admin, clientId, file }: { admin: boolean; clientId: number; file: PayrollFile }) {
-  return <div className="flex flex-wrap gap-2"><a className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-semibold text-white" href={file.driveUrl} rel="noreferrer" target="_blank">Abrir en Drive</a><a className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" href={driveFileDownloadUrl(file.driveFileId)} rel="noreferrer" target="_blank">Descargar</a>{admin ? <form action={setPayrollStatusAction}><input name="clientId" type="hidden" value={clientId} /><input name="payrollFileId" type="hidden" value={file.id} /><input name="isActive" type="hidden" value={String(!file.isActive)} /><button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" type="submit">{file.isActive ? "Desactivar" : "Activar"}</button></form> : null}</div>;
+  return <div className="flex flex-wrap gap-2">{admin ? <a className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-semibold text-white" href={file.driveUrl} rel="noreferrer" target="_blank">Abrir en Drive</a> : null}<a className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" href={`/api/nominas/${file.id}/download`}>Descargar</a>{admin ? <><form action={setPayrollStatusAction}><input name="clientId" type="hidden" value={clientId} /><input name="payrollFileId" type="hidden" value={file.id} /><input name="isActive" type="hidden" value={String(!file.isActive)} /><button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600" type="submit">{file.isActive ? "Desactivar" : "Activar"}</button></form><DeletePayrollButton clientId={clientId} payrollFileId={file.id} /></> : null}</div>;
 }
 
 function Status({ active }: { active: boolean }) { return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{active ? "Activo" : "Inactivo"}</span>; }

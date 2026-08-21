@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 
 import { requireAdminUser } from "@/features/auth/authorization";
 import { firebaseAdminAuth } from "@/features/auth/firebase-admin";
-import { deleteDriveFile, driveFileUrl, ensurePayrollFolder, GoogleDriveError, replaceDriveFolderUser, shareDriveFolderWithUser, uploadDriveFile } from "@/features/purchase-orders/google-drive";
+import { deleteDriveFile, driveFileUrl, ensurePayrollFolder, GoogleDriveError, uploadDriveFile } from "@/features/purchase-orders/google-drive";
 
-import { createClient, createPayrollFile, getClient, isDuplicateClient, rollbackNewClient, saveClientDriveFolder, setClientActive, setPayrollFileActive, updateClient } from "./service";
+import { createClient, createPayrollFile, deletePayrollFile, getClient, getPayrollFileForClient, isDuplicateClient, rollbackNewClient, saveClientDriveFolder, setClientActive, setPayrollFileActive, updateClient } from "./service";
 import type { ClientFormState, PayrollFormState } from "./types";
 import { parseClientId, validateClientForm, validatePayrollUpload } from "./validation";
 
@@ -51,23 +51,15 @@ export async function updateClientAction(clientId: number, _state: ClientFormSta
   if (!parseClientId(clientId)) return { message: "El cliente indicado no es válido." };
   const validation = validateClientForm(formData);
   if (!validation.success) return { message: validation.message, values: validation.values };
-  let permissionChanged: { folderId: string; previousEmail: string; nextEmail: string } | null = null;
-  let databaseUpdated = false;
   try {
     const current = await getClient(clientId);
     if (!current) return { message: "El cliente no existe." };
     const firebaseUser = await firebaseAccount(validation.data.userEmail);
     if (!firebaseUser) return { message: "El correo todavía no existe en Firebase Authentication." };
     if (firebaseUser.uid === admin.uid) return { message: "No puedes asociar el usuario administrador como cliente." };
-    if (current.driveFolderId && current.userEmail !== validation.data.userEmail) {
-      await replaceDriveFolderUser(current.driveFolderId, current.userEmail, validation.data.userEmail);
-      permissionChanged = { folderId: current.driveFolderId, previousEmail: current.userEmail, nextEmail: validation.data.userEmail };
-    }
     if (!await updateClient(clientId, { ...validation.data, firebaseUid: firebaseUser.uid })) return { message: "El cliente no existe." };
-    databaseUpdated = true;
     await assignClientClaim(firebaseUser.uid, clientId);
   } catch (error) {
-    if (permissionChanged && !databaseUpdated) await replaceDriveFolderUser(permissionChanged.folderId, permissionChanged.nextEmail, permissionChanged.previousEmail).catch(() => undefined);
     if (isDuplicateClient(error)) return { message: "El correo o usuario Firebase ya está asociado con otro cliente." };
     console.error("[clients] Failed to update client.");
     return { message: "No fue posible actualizar el cliente." };
@@ -96,7 +88,6 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
   const client = await getClient(clientId);
   if (!client || !client.isActive) return { message: "El cliente no existe o está inactivo." };
   let createdFileId: string | null = null;
-  let sharingPending = false;
   try {
     const folder = await ensurePayrollFolder(client.name, validation.data.year, validation.data.month);
     if (client.driveFolderId !== folder.clientFolderId) await saveClientDriveFolder(clientId, folder.clientFolderId);
@@ -105,12 +96,6 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
     const uploaded = await uploadDriveFile(folder.id, filename, validation.data.file.type || payrollMimeType(validation.data.fileType), bytes);
     createdFileId = uploaded.id;
     await createPayrollFile({ clientId, fileName: uploaded.name, fileType: validation.data.fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
-    try {
-      await shareDriveFolderWithUser(folder.clientFolderId, client.userEmail);
-    } catch (error) {
-      sharingPending = true;
-      console.warn(`[clients] Payroll uploaded, but Drive sharing failed: ${error instanceof GoogleDriveError ? error.message : "unknown error"}`);
-    }
   } catch (error) {
     if (createdFileId) await deleteDriveFile(createdFileId).catch(() => undefined);
     if (error instanceof GoogleDriveError) {
@@ -121,7 +106,7 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
     return { message: "No fue posible guardar la nómina." };
   }
   revalidatePath(`/clientes/${clientId}`);
-  redirect(`/clientes/${clientId}?message=${sharingPending ? "payroll-uploaded-sharing-pending" : "payroll-uploaded"}`);
+  redirect(`/clientes/${clientId}?message=payroll-uploaded`);
 }
 
 export async function setPayrollStatusAction(formData: FormData): Promise<void> {
@@ -133,6 +118,24 @@ export async function setPayrollStatusAction(formData: FormData): Promise<void> 
   await setPayrollFileActive(clientId, payrollFileId, active === "true");
   revalidatePath(`/clientes/${clientId}`);
   redirect(`/clientes/${clientId}?message=payroll-status-updated`);
+}
+
+export async function deletePayrollAction(formData: FormData): Promise<void> {
+  await requireAdminUser();
+  const clientId = parseClientId(formData.get("clientId"));
+  const payrollFileId = parseClientId(formData.get("payrollFileId"));
+  if (!clientId || !payrollFileId) redirect("/clientes");
+  const payroll = await getPayrollFileForClient(clientId, payrollFileId);
+  if (!payroll) redirect(`/clientes/${clientId}?message=payroll-not-found`);
+  try {
+    await deleteDriveFile(payroll.driveFileId);
+    if (!await deletePayrollFile(clientId, payrollFileId)) throw new Error("database-delete-failed");
+  } catch (error) {
+    console.error(`[clients] Payroll deletion failed: ${error instanceof GoogleDriveError ? error.code : "DATABASE"}`);
+    redirect(`/clientes/${clientId}?message=payroll-delete-error`);
+  }
+  revalidatePath(`/clientes/${clientId}`);
+  redirect(`/clientes/${clientId}?message=payroll-deleted`);
 }
 
 function payrollMimeType(type: "pdf" | "xls" | "xlsx"): string {

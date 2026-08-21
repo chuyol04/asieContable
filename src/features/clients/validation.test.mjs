@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateClientForm, validatePayrollUpload } from "./validation.ts";
+import { parsePeriodFilter, validateClientForm, validatePayrollUpload } from "./validation.ts";
 
 test("normaliza el correo del cliente", () => {
   const form = new FormData();
@@ -18,4 +18,14 @@ test("rechaza tipos de archivo distintos de PDF o Excel", () => {
   form.set("periodYear", "2026");
   form.set("payrollFile", new File(["texto"], "nomina.txt", { type: "text/plain" }));
   assert.equal(validatePayrollUpload(form).success, false);
+});
+
+test("normaliza los filtros del reporte de nóminas", () => {
+  assert.deepEqual(parsePeriodFilter("2026", "8", "  nomina semanal  ", "2026-08-15"), {
+    year: 2026,
+    month: 8,
+    name: "nomina semanal",
+    date: "2026-08-15",
+  });
+  assert.equal(parsePeriodFilter("", "", "", "fecha-invalida").date, null);
 });

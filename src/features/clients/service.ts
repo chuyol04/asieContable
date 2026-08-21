@@ -93,17 +93,32 @@ export async function saveClientDriveFolder(clientId: number, folderId: string):
   await getMysqlPool().execute("UPDATE clients SET drive_folder_id = ? WHERE id = ?", [folderId, clientId]);
 }
 
-export async function listPayrollFiles(clientId: number, filters: { year?: number | null; month?: number | null; activeOnly?: boolean } = {}): Promise<PayrollFile[]> {
+export async function listPayrollFiles(clientId: number, filters: { year?: number | null; month?: number | null; name?: string; date?: string | null; activeOnly?: boolean } = {}): Promise<PayrollFile[]> {
   const conditions = ["client_id = ?"];
-  const values: number[] = [clientId];
+  const values: Array<number | string> = [clientId];
   if (filters.year) { conditions.push("period_year = ?"); values.push(filters.year); }
   if (filters.month) { conditions.push("period_month = ?"); values.push(filters.month); }
+  if (filters.name) {
+    conditions.push("file_name LIKE ?");
+    values.push(`%${filters.name.replace(/[\\%_]/g, "\\$&")}%`);
+  }
+  if (filters.date) { conditions.push("payroll_date = ?"); values.push(filters.date); }
   if (filters.activeOnly) conditions.push("is_active = 1");
   const [rows] = await getMysqlPool().execute<PayrollRow[]>(
     `SELECT ${payrollColumns} FROM client_payroll_files WHERE ${conditions.join(" AND ")} ORDER BY period_year DESC, period_month DESC, uploaded_at DESC`,
     values,
   );
   return rows.map(toPayroll);
+}
+
+export async function getPayrollFile(payrollFileId: number): Promise<PayrollFile | null> {
+  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files WHERE id = ? LIMIT 1`, [payrollFileId]);
+  return rows[0] ? toPayroll(rows[0]) : null;
+}
+
+export async function getPayrollFileForClient(clientId: number, payrollFileId: number): Promise<PayrollFile | null> {
+  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files WHERE id = ? AND client_id = ? LIMIT 1`, [payrollFileId, clientId]);
+  return rows[0] ? toPayroll(rows[0]) : null;
 }
 
 export async function createPayrollFile(input: {
@@ -119,6 +134,11 @@ export async function createPayrollFile(input: {
 
 export async function setPayrollFileActive(clientId: number, payrollFileId: number, active: boolean): Promise<boolean> {
   const [result] = await getMysqlPool().execute<ResultSetHeader>("UPDATE client_payroll_files SET is_active = ? WHERE id = ? AND client_id = ?", [active ? 1 : 0, payrollFileId, clientId]);
+  return result.affectedRows > 0;
+}
+
+export async function deletePayrollFile(clientId: number, payrollFileId: number): Promise<boolean> {
+  const [result] = await getMysqlPool().execute<ResultSetHeader>("DELETE FROM client_payroll_files WHERE id = ? AND client_id = ?", [payrollFileId, clientId]);
   return result.affectedRows > 0;
 }
 

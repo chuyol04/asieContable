@@ -289,6 +289,10 @@ export async function deleteDriveFile(fileId: string): Promise<void> {
   await driveFetch(`${API_BASE}/${encodeURIComponent(fileId)}`, { method: "DELETE" });
 }
 
+export async function downloadDriveFile(fileId: string): Promise<Response> {
+  return driveFetch(`${API_BASE}/${encodeURIComponent(fileId)}?alt=media`);
+}
+
 export function driveFileUrl(file: DriveFile): string {
   return file.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`;
 }

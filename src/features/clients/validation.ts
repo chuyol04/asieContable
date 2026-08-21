@@ -77,11 +77,15 @@ export function parseClientStatus(value: unknown): ClientStatusFilter {
   return value === "inactive" || value === "all" ? value : "active";
 }
 
-export function parsePeriodFilter(yearValue: unknown, monthValue: unknown): { year: number | null; month: number | null } {
+export function parsePeriodFilter(yearValue: unknown, monthValue: unknown, nameValue?: unknown, dateValue?: unknown): { year: number | null; month: number | null; name: string; date: string | null } {
   const year = Number(yearValue);
   const month = Number(monthValue);
+  const name = typeof nameValue === "string" ? nameValue.trim().slice(0, 255) : "";
+  const date = typeof dateValue === "string" && validDate(dateValue) ? dateValue : null;
   return {
     year: Number.isInteger(year) && year >= 2000 && year <= 2200 ? year : null,
     month: Number.isInteger(month) && month >= 1 && month <= 12 ? month : null,
+    name,
+    date,
   };
 }
