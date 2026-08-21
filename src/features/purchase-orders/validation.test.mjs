@@ -8,13 +8,16 @@ test("acepta IVA por partida y rechaza porcentajes fuera de rango", () => {
   form.set("orderDate", "2026-08-18");
   form.set("deliveryDate", "2026-08-18");
   form.set("supplierLegalName", "Proveedor");
-  form.set("items", JSON.stringify([{ itemId: null, productId: 1, quantity: "2", unitPrice: "50", discount: "0", taxRate: "8" }]));
+  form.set("items", JSON.stringify([{ itemId: null, productId: 1, unit: "CAJA", quantity: "2", unitPrice: "50", discount: "0", taxRate: "8" }]));
 
   const valid = validatePurchaseOrderForm(form);
   assert.equal(valid.success, true);
-  if (valid.success) assert.equal(valid.data.items[0].taxRate, "8.00");
+  if (valid.success) {
+    assert.equal(valid.data.items[0].taxRate, "8.00");
+    assert.equal(valid.data.items[0].unit, "CAJA");
+  }
 
-  form.set("items", JSON.stringify([{ itemId: null, productId: 1, quantity: "2", unitPrice: "50", discount: "0", taxRate: "101" }]));
+  form.set("items", JSON.stringify([{ itemId: null, productId: 1, unit: "CAJA", quantity: "2", unitPrice: "50", discount: "0", taxRate: "101" }]));
   assert.equal(validatePurchaseOrderForm(form).success, false);
 });
 

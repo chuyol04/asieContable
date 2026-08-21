@@ -51,6 +51,7 @@ export interface PurchaseOrderDetail extends PurchaseOrder { items: PurchaseOrde
 export interface PurchaseOrderItemDraft {
   itemId: number | null;
   productId: number;
+  unit: string;
   quantity: string;
   unitPrice: string;
   discount: string;

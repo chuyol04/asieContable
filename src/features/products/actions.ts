@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { validateActiveCompany } from "@/features/company-context/service";
 
-import { createProduct, isDuplicateProductReference, setProductActive, updateProduct } from "./service";
-import type { ProductFormState } from "./types";
-import { parseProductId, validateProductForm } from "./validation";
+import { createProduct, importProducts, isDuplicateProductReference, setProductActive, updateProduct } from "./service";
+import type { ProductFormState, ProductImportResult, ProductImportState } from "./types";
+import { parseProductId, validateProductForm, validateProductImport } from "./validation";
 
 const duplicateMessage = "Ya existe un producto con esa referencia en esta empresa.";
 const saveErrorMessage = "No fue posible guardar el producto. Inténtalo nuevamente.";
@@ -65,4 +65,22 @@ export async function setProductStatusAction(formData: FormData): Promise<void> 
   revalidatePath(`/empresas/${companyId}`);
   revalidatePath(`/empresas/${companyId}/productos/${productId}`);
   redirect(`/empresas/${companyId}?tab=productos&message=status-updated`);
+}
+
+export async function importProductsAction(companyId: number, _state: ProductImportState, formData: FormData): Promise<ProductImportState> {
+  if (!parseProductId(companyId)) return { message: "La empresa indicada no es válida." };
+  await validateActiveCompany(companyId);
+  const validation = validateProductImport(formData);
+  if (!validation.success) return { message: validation.message };
+
+  let result: ProductImportResult;
+  try {
+    result = await importProducts(companyId, validation.names);
+  } catch {
+    console.error("[products] Failed to import products.");
+    return { message: "No fue posible guardar la lista de productos." };
+  }
+  revalidatePath("/productos");
+  revalidatePath(`/empresas/${companyId}`);
+  redirect(`/productos?message=imported&created=${result.created}&skipped=${result.skipped}`);
 }

@@ -152,7 +152,7 @@ async function resolveItems(connection: PoolConnection, companyId: number, draft
     if (!draft.itemId && !product) throw new PurchaseOrderError("INVALID_PRODUCT");
     const snapshot = previous ? { productId: previous.productId, productReference: previous.productReference, productName: previous.productName, description: previous.description, unit: previous.unit } : { productId: product!.id, productReference: product!.sku, productName: product!.name, description: product!.description, unit: product!.unit };
     const calculated = calculatePurchaseOrderItem({ quantity: draft.quantity, unitPrice: draft.unitPrice, discount: draft.discount, taxRate: draft.taxRate });
-    return { ...snapshot, ...calculated };
+    return { ...snapshot, unit: draft.unit, ...calculated };
   });
 }
 

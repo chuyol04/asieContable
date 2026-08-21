@@ -46,6 +46,15 @@ export interface ProductFormState {
   values?: ProductFormValues;
 }
 
+export interface ProductImportState {
+  message: string;
+}
+
+export interface ProductImportResult {
+  created: number;
+  skipped: number;
+}
+
 export type ProductFormAction = (
   state: ProductFormState,
   formData: FormData,

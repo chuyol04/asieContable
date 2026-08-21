@@ -1,7 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { getMysqlPool } from "@/lib/database/mysql";
-import type { Product, ProductInput, ProductStatusFilter } from "./types";
+import type { Product, ProductImportResult, ProductInput, ProductStatusFilter } from "./types";
 
 interface ProductRow extends RowDataPacket {
   id: number;
@@ -76,6 +76,35 @@ export async function createProduct(companyId: number, input: ProductInput): Pro
     [companyId, input.sku, input.name, input.description, input.unit, input.unitPrice, input.purchaseCost, input.defaultMarginPercentage, input.taxRate, input.notes],
   );
   return result.insertId;
+}
+
+export async function importProducts(companyId: number, names: string[]): Promise<ProductImportResult> {
+  const connection = await getMysqlPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    const [existingRows] = await connection.execute<Array<RowDataPacket & { name: string }>>(
+      "SELECT name FROM products WHERE company_id = ?",
+      [companyId],
+    );
+    const existingNames = new Set(existingRows.map((row) => row.name.trim().toLocaleLowerCase("es-MX")));
+    const pending = names.filter((name) => !existingNames.has(name.toLocaleLowerCase("es-MX")));
+
+    if (pending.length) {
+      const placeholders = pending.map(() => "(?, ?, '', 'POR DEFINIR', 0.00, NULL)").join(", ");
+      const parameters = pending.flatMap((name) => [companyId, name]);
+      await connection.execute(
+        `INSERT INTO products (company_id, name, description, unit, unit_price, tax_rate) VALUES ${placeholders}`,
+        parameters,
+      );
+    }
+    await connection.commit();
+    return { created: pending.length, skipped: names.length - pending.length };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function updateProduct(companyId: number, id: number, input: ProductInput): Promise<boolean> {

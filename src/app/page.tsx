@@ -21,7 +21,7 @@ export default async function Home() {
           </p>
         </div>
 
-        <section aria-label="Estado del entorno" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section aria-label="Estado del entorno" className="grid gap-4 sm:grid-cols-2">
           <StatusCard label="Aplicación" value="En línea" detail="Next.js disponible" tone="emerald" />
           <StatusCard
             label="Base de datos"
@@ -29,7 +29,6 @@ export default async function Home() {
             detail="MySQL local"
             tone={databaseConnected ? "emerald" : "amber"}
           />
-          <StatusCard label="Etapa de desarrollo" value="Fase 4" detail="Entregas de efectivo" tone="cyan" />
         </section>
 
         <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-200/40">

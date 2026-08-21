@@ -23,13 +23,14 @@ export function validatePurchaseOrderForm(formData: FormData): ValidationResult 
     const item = raw as Record<string, unknown>;
     const productId = parsePurchaseOrderId(item.productId);
     const itemId = item.itemId === null || item.itemId === undefined ? null : parsePurchaseOrderId(item.itemId);
+    const unit = typeof item.unit === "string" ? item.unit.trim() : "";
     const quantity = normalizeQuantity(item.quantity);
     const unitPrice = normalizeMoney(item.unitPrice);
     const discount = normalizeMoney(item.discount);
     const taxRate = normalizeMoney(item.taxRate === "" || item.taxRate === null || item.taxRate === undefined ? "0" : item.taxRate);
     const numericTaxRate = Number(taxRate);
-    if (!productId || (item.itemId !== null && item.itemId !== undefined && !itemId) || !quantity || !unitPrice || !discount || !taxRate || unitPrice.startsWith("-") || discount.startsWith("-") || numericTaxRate < 0 || numericTaxRate > 100) return { success: false, message: "Una partida contiene producto, cantidad, precio, descuento o IVA inválido.", values };
-    items.push({ itemId, productId, quantity, unitPrice, discount, taxRate });
+    if (!productId || (item.itemId !== null && item.itemId !== undefined && !itemId) || !unit || unit.length > 64 || !quantity || !unitPrice || !discount || !taxRate || unitPrice.startsWith("-") || discount.startsWith("-") || numericTaxRate < 0 || numericTaxRate > 100) return { success: false, message: "Una partida contiene producto, unidad, cantidad, precio, descuento o IVA inválido.", values };
+    items.push({ itemId, productId, unit, quantity, unitPrice, discount, taxRate });
   }
   return { success: true, data: { orderDate: values.orderDate, deliveryDate: values.deliveryDate, supplierLegalName: values.supplierLegalName, supplierTaxId: values.supplierTaxId || null, supplierAddress: values.supplierAddress || null, supplierPhone: values.supplierPhone || null, notes: values.notes || null, items } };
 }

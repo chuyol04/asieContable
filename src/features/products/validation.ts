@@ -76,3 +76,30 @@ export function parseProductId(value: unknown): number | null {
 export function parseProductStatus(value: unknown): ProductStatusFilter {
   return value === "inactive" || value === "all" ? value : "active";
 }
+
+export function validateProductImport(formData: FormData):
+  | { success: true; names: string[] }
+  | { success: false; message: string } {
+  const rawNames = text(formData, "names");
+  if (!rawNames) return { success: false, message: "Selecciona un Excel y confirma la vista previa." };
+
+  let parsed: unknown;
+  try { parsed = JSON.parse(rawNames); } catch { return { success: false, message: "La vista previa no es válida." }; }
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 2_000) {
+    return { success: false, message: "La carga debe contener entre 1 y 2000 productos." };
+  }
+
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const value of parsed) {
+    if (typeof value !== "string") return { success: false, message: "La lista contiene un producto inválido." };
+    const name = value.trim();
+    if (!name || name.length > 191) return { success: false, message: "Cada producto debe tener un nombre de máximo 191 caracteres." };
+    const key = name.toLocaleLowerCase("es-MX");
+    if (!seen.has(key)) {
+      seen.add(key);
+      names.push(name);
+    }
+  }
+  return { success: true, names };
+}
