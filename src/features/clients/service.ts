@@ -4,7 +4,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { getMysqlPool } from "@/lib/database/mysql";
 
-import type { Client, ClientInput, ClientStatusFilter, PayrollFile } from "./types";
+import type { Client, ClientInput, ClientPayrollCompany, ClientStatusFilter, PayrollFile } from "./types";
 
 interface ClientRow extends RowDataPacket {
   id: number; name: string; legal_name: string | null; tax_id: string | null; user_email: string;
@@ -13,13 +13,17 @@ interface ClientRow extends RowDataPacket {
 }
 
 interface PayrollRow extends RowDataPacket {
-  id: number; client_id: number; file_name: string; file_type: "pdf" | "xls" | "xlsx";
+  id: number; client_id: number; payroll_company_id: number; payroll_company_name: string; file_name: string; file_type: "pdf" | "xls" | "xlsx";
   drive_file_id: string; drive_url: string; payroll_date: Date | string | null; period_month: number;
   period_year: number; notes: string | null; uploaded_at: Date; is_active: 0 | 1;
 }
 
+interface PayrollCompanyRow extends RowDataPacket {
+  id: number; client_id: number; name: string; is_active: 0 | 1; created_at: Date; updated_at: Date;
+}
+
 const clientColumns = "id, name, legal_name, tax_id, user_email, firebase_uid, phone, website, notes, drive_folder_id, is_active, created_at, updated_at";
-const payrollColumns = "id, client_id, file_name, file_type, drive_file_id, drive_url, payroll_date, period_month, period_year, notes, uploaded_at, is_active";
+const payrollColumns = "payroll.id, payroll.client_id, payroll.payroll_company_id, payroll_company.name AS payroll_company_name, payroll.file_name, payroll.file_type, payroll.drive_file_id, payroll.drive_url, payroll.payroll_date, payroll.period_month, payroll.period_year, payroll.notes, payroll.uploaded_at, payroll.is_active";
 
 function toClient(row: ClientRow): Client {
   return { id: row.id, name: row.name, legalName: row.legal_name, taxId: row.tax_id, userEmail: row.user_email, firebaseUid: row.firebase_uid, phone: row.phone, website: row.website, notes: row.notes, driveFolderId: row.drive_folder_id, isActive: Boolean(row.is_active), createdAt: row.created_at, updatedAt: row.updated_at };
@@ -32,7 +36,11 @@ function dateOnly(value: Date | string | null): string | null {
 }
 
 function toPayroll(row: PayrollRow): PayrollFile {
-  return { id: row.id, clientId: row.client_id, fileName: row.file_name, fileType: row.file_type, driveFileId: row.drive_file_id, driveUrl: row.drive_url, payrollDate: dateOnly(row.payroll_date), periodMonth: row.period_month, periodYear: row.period_year, notes: row.notes, uploadedAt: row.uploaded_at, isActive: Boolean(row.is_active) };
+  return { id: row.id, clientId: row.client_id, payrollCompanyId: row.payroll_company_id, payrollCompanyName: row.payroll_company_name, fileName: row.file_name, fileType: row.file_type, driveFileId: row.drive_file_id, driveUrl: row.drive_url, payrollDate: dateOnly(row.payroll_date), periodMonth: row.period_month, periodYear: row.period_year, notes: row.notes, uploadedAt: row.uploaded_at, isActive: Boolean(row.is_active) };
+}
+
+function toPayrollCompany(row: PayrollCompanyRow): ClientPayrollCompany {
+  return { id: row.id, clientId: row.client_id, name: row.name, isActive: Boolean(row.is_active), createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 export async function listClients(search = "", status: ClientStatusFilter = "active"): Promise<Client[]> {
@@ -93,41 +101,74 @@ export async function saveClientDriveFolder(clientId: number, folderId: string):
   await getMysqlPool().execute("UPDATE clients SET drive_folder_id = ? WHERE id = ?", [folderId, clientId]);
 }
 
-export async function listPayrollFiles(clientId: number, filters: { year?: number | null; month?: number | null; name?: string; date?: string | null; activeOnly?: boolean } = {}): Promise<PayrollFile[]> {
-  const conditions = ["client_id = ?"];
+export async function listPayrollCompanies(clientId: number, activeOnly = false): Promise<ClientPayrollCompany[]> {
+  const [rows] = await getMysqlPool().execute<PayrollCompanyRow[]>(
+    `SELECT id, client_id, name, is_active, created_at, updated_at FROM client_payroll_companies WHERE client_id = ?${activeOnly ? " AND is_active = 1" : ""} ORDER BY name`,
+    [clientId],
+  );
+  return rows.map(toPayrollCompany);
+}
+
+export async function getPayrollCompanyForClient(clientId: number, payrollCompanyId: number): Promise<ClientPayrollCompany | null> {
+  const [rows] = await getMysqlPool().execute<PayrollCompanyRow[]>(
+    "SELECT id, client_id, name, is_active, created_at, updated_at FROM client_payroll_companies WHERE id = ? AND client_id = ? LIMIT 1",
+    [payrollCompanyId, clientId],
+  );
+  return rows[0] ? toPayrollCompany(rows[0]) : null;
+}
+
+export async function createPayrollCompany(clientId: number, name: string): Promise<number> {
+  const [result] = await getMysqlPool().execute<ResultSetHeader>(
+    "INSERT INTO client_payroll_companies (client_id, name) VALUES (?, ?)",
+    [clientId, name],
+  );
+  return result.insertId;
+}
+
+export async function setPayrollCompanyActive(clientId: number, payrollCompanyId: number, active: boolean): Promise<boolean> {
+  const [result] = await getMysqlPool().execute<ResultSetHeader>(
+    "UPDATE client_payroll_companies SET is_active = ? WHERE id = ? AND client_id = ?",
+    [active ? 1 : 0, payrollCompanyId, clientId],
+  );
+  return result.affectedRows > 0;
+}
+
+export async function listPayrollFiles(clientId: number, filters: { payrollCompanyId?: number | null; year?: number | null; month?: number | null; name?: string; date?: string | null; activeOnly?: boolean } = {}): Promise<PayrollFile[]> {
+  const conditions = ["payroll.client_id = ?"];
   const values: Array<number | string> = [clientId];
-  if (filters.year) { conditions.push("period_year = ?"); values.push(filters.year); }
-  if (filters.month) { conditions.push("period_month = ?"); values.push(filters.month); }
+  if (filters.payrollCompanyId) { conditions.push("payroll.payroll_company_id = ?"); values.push(filters.payrollCompanyId); }
+  if (filters.year) { conditions.push("payroll.period_year = ?"); values.push(filters.year); }
+  if (filters.month) { conditions.push("payroll.period_month = ?"); values.push(filters.month); }
   if (filters.name) {
-    conditions.push("file_name LIKE ?");
+    conditions.push("payroll.file_name LIKE ?");
     values.push(`%${filters.name.replace(/[\\%_]/g, "\\$&")}%`);
   }
-  if (filters.date) { conditions.push("payroll_date = ?"); values.push(filters.date); }
-  if (filters.activeOnly) conditions.push("is_active = 1");
+  if (filters.date) { conditions.push("payroll.payroll_date = ?"); values.push(filters.date); }
+  if (filters.activeOnly) conditions.push("payroll.is_active = 1");
   const [rows] = await getMysqlPool().execute<PayrollRow[]>(
-    `SELECT ${payrollColumns} FROM client_payroll_files WHERE ${conditions.join(" AND ")} ORDER BY period_year DESC, period_month DESC, uploaded_at DESC`,
+    `SELECT ${payrollColumns} FROM client_payroll_files AS payroll INNER JOIN client_payroll_companies AS payroll_company ON payroll_company.id = payroll.payroll_company_id WHERE ${conditions.join(" AND ")} ORDER BY payroll_company.name, payroll.period_year DESC, payroll.period_month DESC, payroll.uploaded_at DESC`,
     values,
   );
   return rows.map(toPayroll);
 }
 
 export async function getPayrollFile(payrollFileId: number): Promise<PayrollFile | null> {
-  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files WHERE id = ? LIMIT 1`, [payrollFileId]);
+  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files AS payroll INNER JOIN client_payroll_companies AS payroll_company ON payroll_company.id = payroll.payroll_company_id WHERE payroll.id = ? LIMIT 1`, [payrollFileId]);
   return rows[0] ? toPayroll(rows[0]) : null;
 }
 
 export async function getPayrollFileForClient(clientId: number, payrollFileId: number): Promise<PayrollFile | null> {
-  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files WHERE id = ? AND client_id = ? LIMIT 1`, [payrollFileId, clientId]);
+  const [rows] = await getMysqlPool().execute<PayrollRow[]>(`SELECT ${payrollColumns} FROM client_payroll_files AS payroll INNER JOIN client_payroll_companies AS payroll_company ON payroll_company.id = payroll.payroll_company_id WHERE payroll.id = ? AND payroll.client_id = ? LIMIT 1`, [payrollFileId, clientId]);
   return rows[0] ? toPayroll(rows[0]) : null;
 }
 
 export async function createPayrollFile(input: {
-  clientId: number; fileName: string; fileType: "pdf" | "xls" | "xlsx"; driveFileId: string;
+  clientId: number; payrollCompanyId: number; fileName: string; fileType: "pdf" | "xls" | "xlsx"; driveFileId: string;
   driveUrl: string; payrollDate: string | null; periodMonth: number; periodYear: number; notes: string | null;
 }): Promise<number> {
   const [result] = await getMysqlPool().execute<ResultSetHeader>(
-    "INSERT INTO client_payroll_files (client_id, file_name, file_type, drive_file_id, drive_url, payroll_date, period_month, period_year, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [input.clientId, input.fileName, input.fileType, input.driveFileId, input.driveUrl, input.payrollDate, input.periodMonth, input.periodYear, input.notes],
+    "INSERT INTO client_payroll_files (client_id, payroll_company_id, file_name, file_type, drive_file_id, drive_url, payroll_date, period_month, period_year, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [input.clientId, input.payrollCompanyId, input.fileName, input.fileType, input.driveFileId, input.driveUrl, input.payrollDate, input.periodMonth, input.periodYear, input.notes],
   );
   return result.insertId;
 }

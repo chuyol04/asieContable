@@ -40,9 +40,20 @@ export interface ClientFormValues {
 export interface ClientFormState { message: string; values?: ClientFormValues }
 export type ClientFormAction = (state: ClientFormState, formData: FormData) => Promise<ClientFormState>;
 
+export interface ClientPayrollCompany {
+  id: number;
+  clientId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface PayrollFile {
   id: number;
   clientId: number;
+  payrollCompanyId: number;
+  payrollCompanyName: string;
   fileName: string;
   fileType: "pdf" | "xls" | "xlsx";
   driveFileId: string;

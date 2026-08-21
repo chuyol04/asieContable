@@ -201,19 +201,25 @@ export async function ensureCompanyDocumentFolder(companyName: string, category:
   return { id: parentId, path: names.join(" / "), url: `https://drive.google.com/drive/folders/${encodeURIComponent(parentId)}` };
 }
 
-export async function ensurePayrollFolder(clientName: string, year: number, month: number): Promise<DriveFolder & { clientFolderId: string }> {
+export async function ensurePayrollFolder(clientName: string, payrollCompanyName: string, year: number, month: number): Promise<DriveFolder & { clientFolderId: string }> {
   if (!Number.isInteger(year) || year < 2000 || year > 2200 || !Number.isInteger(month) || month < 1 || month > 12) {
     throw new GoogleDriveError("API", "El periodo de nómina no es válido.");
   }
   const root = (await getRootFolders()).payrolls;
   const clientNameSafe = folderName(clientName);
+  const payrollCompanyNameSafe = folderName(payrollCompanyName);
   const clientFolderId = await ensureFolder(clientNameSafe, root);
-  const yearFolderId = await ensureFolder(String(year), clientFolderId);
+  const companyFolderId = payrollCompanyNameSafe.localeCompare(clientNameSafe, "es", { sensitivity: "base" }) === 0
+    ? clientFolderId
+    : await ensureFolder(payrollCompanyNameSafe, clientFolderId);
+  const yearFolderId = await ensureFolder(String(year), companyFolderId);
   const id = await ensureFolder(months[month - 1], yearFolderId);
   return {
     id,
     clientFolderId,
-    path: `${clientNameSafe} / ${year} / ${months[month - 1]}`,
+    path: companyFolderId === clientFolderId
+      ? `${clientNameSafe} / ${year} / ${months[month - 1]}`
+      : `${clientNameSafe} / ${payrollCompanyNameSafe} / ${year} / ${months[month - 1]}`,
     url: `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`,
   };
 }

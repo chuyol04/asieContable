@@ -1,7 +1,7 @@
 import type { ClientFormValues, ClientInput, ClientStatusFilter } from "./types";
 
 type ClientValidation = { success: true; data: Omit<ClientInput, "firebaseUid"> } | { success: false; message: string; values: ClientFormValues };
-export type PayrollUpload = { files: Array<{ file: File; fileType: "pdf" | "xls" | "xlsx" }>; month: number; year: number; payrollDate: string | null; notes: string | null };
+export type PayrollUpload = { files: Array<{ file: File; fileType: "pdf" | "xls" | "xlsx" }>; payrollCompanyId: number; month: number; year: number; payrollDate: string | null; notes: string | null };
 type PayrollValidation = { success: true; data: PayrollUpload } | { success: false; message: string };
 
 export const MAX_PAYROLL_FILE_BYTES = 20 * 1024 * 1024;
@@ -54,10 +54,12 @@ export function validateClientForm(formData: FormData): ClientValidation {
 
 export function validatePayrollUpload(formData: FormData): PayrollValidation {
   const values = formData.getAll("payrollFiles");
+  const payrollCompanyId = parseClientId(formData.get("payrollCompanyId"));
   const month = Number(text(formData, "periodMonth"));
   const year = Number(text(formData, "periodYear"));
   const payrollDateValue = text(formData, "payrollDate");
   const notes = text(formData, "notes");
+  if (!payrollCompanyId) return { success: false, message: "Selecciona la empresa de nómina." };
   if (!values.length || values.some((value) => !(value instanceof File) || value.size === 0)) return { success: false, message: "Selecciona uno o varios archivos PDF, XLS o XLSX." };
   if (values.length > MAX_PAYROLL_FILES) return { success: false, message: `Puedes cargar máximo ${MAX_PAYROLL_FILES} archivos a la vez.` };
   const files = values.map((value) => {
@@ -72,7 +74,13 @@ export function validatePayrollUpload(formData: FormData): PayrollValidation {
   if (!Number.isInteger(year) || year < 2000 || year > 2200) return { success: false, message: "Ingresa un año válido." };
   if (payrollDateValue && !validDate(payrollDateValue)) return { success: false, message: "La fecha de nómina no es válida." };
   if (notes.length > 5_000) return { success: false, message: "Las observaciones son demasiado largas." };
-  return { success: true, data: { files: files as PayrollUpload["files"], month, year, payrollDate: payrollDateValue || null, notes: notes || null } };
+  return { success: true, data: { files: files as PayrollUpload["files"], payrollCompanyId, month, year, payrollDate: payrollDateValue || null, notes: notes || null } };
+}
+
+export function validatePayrollCompanyName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim().replace(/\s+/g, " ");
+  return name && name.length <= 191 ? name : null;
 }
 
 export function parseClientId(value: unknown): number | null {

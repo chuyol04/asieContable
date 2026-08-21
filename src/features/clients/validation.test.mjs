@@ -14,6 +14,7 @@ test("normaliza el correo del cliente", () => {
 
 test("rechaza tipos de archivo distintos de PDF o Excel", () => {
   const form = new FormData();
+  form.set("payrollCompanyId", "1");
   form.set("periodMonth", "8");
   form.set("periodYear", "2026");
   form.set("payrollFiles", new File(["texto"], "nomina.txt", { type: "text/plain" }));
@@ -22,6 +23,7 @@ test("rechaza tipos de archivo distintos de PDF o Excel", () => {
 
 test("acepta varios archivos con la misma fecha y observación", () => {
   const form = new FormData();
+  form.set("payrollCompanyId", "9");
   form.set("periodMonth", "8");
   form.set("periodYear", "2026");
   form.set("payrollDate", "2026-08-20");
@@ -32,8 +34,17 @@ test("acepta varios archivos con la misma fecha y observación", () => {
   assert.equal(result.success, true);
   if (result.success) {
     assert.equal(result.data.files.length, 2);
+    assert.equal(result.data.payrollCompanyId, 9);
     assert.equal(result.data.notes, "Depósitos del mismo día");
   }
+});
+
+test("requiere seleccionar una empresa de nómina", () => {
+  const form = new FormData();
+  form.set("periodMonth", "8");
+  form.set("periodYear", "2026");
+  form.set("payrollFiles", new File(["pdf"], "nomina.pdf", { type: "application/pdf" }));
+  assert.equal(validatePayrollUpload(form).success, false);
 });
 
 test("normaliza los filtros del reporte de nóminas", () => {

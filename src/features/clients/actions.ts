@@ -7,9 +7,9 @@ import { requireAdminUser } from "@/features/auth/authorization";
 import { firebaseAdminAuth } from "@/features/auth/firebase-admin";
 import { deleteDriveFile, driveFileUrl, ensurePayrollFolder, GoogleDriveError, uploadDriveFile } from "@/features/purchase-orders/google-drive";
 
-import { createClient, createPayrollFile, deletePayrollFile, getClient, getPayrollFileForClient, isDuplicateClient, rollbackNewClient, saveClientDriveFolder, setClientActive, setPayrollFileActive, updateClient } from "./service";
+import { createClient, createPayrollCompany, createPayrollFile, deletePayrollFile, getClient, getPayrollCompanyForClient, getPayrollFileForClient, isDuplicateClient, rollbackNewClient, saveClientDriveFolder, setClientActive, setPayrollCompanyActive, setPayrollFileActive, updateClient } from "./service";
 import type { ClientFormState, PayrollFormState } from "./types";
-import { parseClientId, validateClientForm, validatePayrollUpload } from "./validation";
+import { parseClientId, validateClientForm, validatePayrollCompanyName, validatePayrollUpload } from "./validation";
 
 async function firebaseAccount(email: string) {
   try { return await firebaseAdminAuth.getUserByEmail(email); }
@@ -80,6 +80,32 @@ export async function setClientStatusAction(formData: FormData): Promise<void> {
   redirect(`/clientes/${clientId}?message=status-updated`);
 }
 
+export async function createPayrollCompanyAction(clientId: number, formData: FormData): Promise<void> {
+  await requireAdminUser();
+  const name = validatePayrollCompanyName(formData.get("name"));
+  if (!parseClientId(clientId) || !name || !await getClient(clientId)) redirect(`/clientes/${clientId}?message=payroll-company-invalid`);
+  try {
+    await createPayrollCompany(clientId, name);
+  } catch (error) {
+    if (isDuplicateClient(error)) redirect(`/clientes/${clientId}?message=payroll-company-duplicate`);
+    console.error("[clients] Failed to create payroll company.");
+    redirect(`/clientes/${clientId}?message=payroll-company-error`);
+  }
+  revalidatePath(`/clientes/${clientId}`);
+  redirect(`/clientes/${clientId}?message=payroll-company-created`);
+}
+
+export async function setPayrollCompanyStatusAction(formData: FormData): Promise<void> {
+  await requireAdminUser();
+  const clientId = parseClientId(formData.get("clientId"));
+  const payrollCompanyId = parseClientId(formData.get("payrollCompanyId"));
+  const active = formData.get("isActive");
+  if (!clientId || !payrollCompanyId || (active !== "true" && active !== "false")) redirect("/clientes");
+  await setPayrollCompanyActive(clientId, payrollCompanyId, active === "true");
+  revalidatePath(`/clientes/${clientId}`);
+  redirect(`/clientes/${clientId}?message=payroll-company-status-updated`);
+}
+
 export async function uploadPayrollAction(clientId: number, _state: PayrollFormState, formData: FormData): Promise<PayrollFormState> {
   await requireAdminUser();
   if (!parseClientId(clientId)) return { message: "El cliente indicado no es válido." };
@@ -87,9 +113,11 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
   if (!validation.success) return { message: validation.message };
   const client = await getClient(clientId);
   if (!client || !client.isActive) return { message: "El cliente no existe o está inactivo." };
+  const payrollCompany = await getPayrollCompanyForClient(clientId, validation.data.payrollCompanyId);
+  if (!payrollCompany || !payrollCompany.isActive) return { message: "La empresa de nómina no existe, no pertenece al cliente o está inactiva." };
   const created: Array<{ driveFileId: string; payrollFileId?: number }> = [];
   try {
-    const folder = await ensurePayrollFolder(client.name, validation.data.year, validation.data.month);
+    const folder = await ensurePayrollFolder(client.name, payrollCompany.name, validation.data.year, validation.data.month);
     if (client.driveFolderId !== folder.clientFolderId) await saveClientDriveFolder(clientId, folder.clientFolderId);
     for (const { file, fileType } of validation.data.files) {
       const filename = file.name.replace(/[\\/]/g, "-").slice(0, 255);
@@ -97,7 +125,7 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
       const uploaded = await uploadDriveFile(folder.id, filename, file.type || payrollMimeType(fileType), bytes);
       const entry: { driveFileId: string; payrollFileId?: number } = { driveFileId: uploaded.id };
       created.push(entry);
-      entry.payrollFileId = await createPayrollFile({ clientId, fileName: uploaded.name, fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
+      entry.payrollFileId = await createPayrollFile({ clientId, payrollCompanyId: payrollCompany.id, fileName: uploaded.name, fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
     }
   } catch (error) {
     await Promise.all(created.map(async ({ driveFileId, payrollFileId }) => {
