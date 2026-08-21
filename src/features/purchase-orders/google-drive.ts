@@ -220,9 +220,7 @@ export async function ensurePayrollFolder(clientName: string, year: number, mont
 
 export async function shareDriveFolderWithUser(folderId: string, email: string): Promise<void> {
   const safeFolderId = encodeURIComponent(folderId);
-  const current = await requestJson<{ permissions?: Array<{ emailAddress?: string; type?: string; role?: string }> }>(
-    `${API_BASE}/${safeFolderId}/permissions?fields=permissions(emailAddress,type,role)&pageSize=100`,
-  );
+  const current = await driveFolderPermissions(safeFolderId);
   const normalizedEmail = email.trim().toLowerCase();
   if (current.permissions?.some((permission) => permission.type === "user" && permission.emailAddress?.toLowerCase() === normalizedEmail && permission.role === "reader")) return;
   const params = new URLSearchParams({ fields: "id", sendNotificationEmail: "false" });
@@ -231,6 +229,23 @@ export async function shareDriveFolderWithUser(folderId: string, email: string):
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type: "user", role: "reader", emailAddress: normalizedEmail }),
   });
+}
+
+export async function replaceDriveFolderUser(folderId: string, previousEmail: string, nextEmail: string): Promise<void> {
+  const previous = previousEmail.trim().toLowerCase();
+  const next = nextEmail.trim().toLowerCase();
+  if (previous === next) return;
+  await shareDriveFolderWithUser(folderId, next);
+  const safeFolderId = encodeURIComponent(folderId);
+  const permissions = await driveFolderPermissions(safeFolderId);
+  const previousPermissions = permissions.permissions?.filter((permission) => permission.id && permission.type === "user" && permission.emailAddress?.toLowerCase() === previous && permission.role !== "owner") ?? [];
+  for (const permission of previousPermissions) {
+    await driveFetch(`${API_BASE}/${safeFolderId}/permissions/${encodeURIComponent(permission.id!)}`, { method: "DELETE" });
+  }
+}
+
+async function driveFolderPermissions(safeFolderId: string): Promise<{ permissions?: Array<{ id?: string; emailAddress?: string; type?: string; role?: string }> }> {
+  return requestJson(`${API_BASE}/${safeFolderId}/permissions?fields=permissions(id,emailAddress,type,role)&pageSize=100`);
 }
 
 function multipartBody(metadata: object, data: Uint8Array, filename: string, mimeType: string): FormData {

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireAdminUser } from "@/features/auth/authorization";
 import { firebaseAdminAuth } from "@/features/auth/firebase-admin";
-import { deleteDriveFile, driveFileUrl, ensurePayrollFolder, GoogleDriveError, shareDriveFolderWithUser, uploadDriveFile } from "@/features/purchase-orders/google-drive";
+import { deleteDriveFile, driveFileUrl, ensurePayrollFolder, GoogleDriveError, replaceDriveFolderUser, shareDriveFolderWithUser, uploadDriveFile } from "@/features/purchase-orders/google-drive";
 
 import { createClient, createPayrollFile, getClient, isDuplicateClient, rollbackNewClient, saveClientDriveFolder, setClientActive, setPayrollFileActive, updateClient } from "./service";
 import type { ClientFormState, PayrollFormState } from "./types";
@@ -51,13 +51,23 @@ export async function updateClientAction(clientId: number, _state: ClientFormSta
   if (!parseClientId(clientId)) return { message: "El cliente indicado no es válido." };
   const validation = validateClientForm(formData);
   if (!validation.success) return { message: validation.message, values: validation.values };
+  let permissionChanged: { folderId: string; previousEmail: string; nextEmail: string } | null = null;
+  let databaseUpdated = false;
   try {
+    const current = await getClient(clientId);
+    if (!current) return { message: "El cliente no existe." };
     const firebaseUser = await firebaseAccount(validation.data.userEmail);
     if (!firebaseUser) return { message: "El correo todavía no existe en Firebase Authentication." };
     if (firebaseUser.uid === admin.uid) return { message: "No puedes asociar el usuario administrador como cliente." };
+    if (current.driveFolderId && current.userEmail !== validation.data.userEmail) {
+      await replaceDriveFolderUser(current.driveFolderId, current.userEmail, validation.data.userEmail);
+      permissionChanged = { folderId: current.driveFolderId, previousEmail: current.userEmail, nextEmail: validation.data.userEmail };
+    }
     if (!await updateClient(clientId, { ...validation.data, firebaseUid: firebaseUser.uid })) return { message: "El cliente no existe." };
+    databaseUpdated = true;
     await assignClientClaim(firebaseUser.uid, clientId);
   } catch (error) {
+    if (permissionChanged && !databaseUpdated) await replaceDriveFolderUser(permissionChanged.folderId, permissionChanged.nextEmail, permissionChanged.previousEmail).catch(() => undefined);
     if (isDuplicateClient(error)) return { message: "El correo o usuario Firebase ya está asociado con otro cliente." };
     console.error("[clients] Failed to update client.");
     return { message: "No fue posible actualizar el cliente." };
