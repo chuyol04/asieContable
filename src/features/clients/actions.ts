@@ -96,23 +96,32 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
   const client = await getClient(clientId);
   if (!client || !client.isActive) return { message: "El cliente no existe o está inactivo." };
   let createdFileId: string | null = null;
+  let sharingPending = false;
   try {
     const folder = await ensurePayrollFolder(client.name, validation.data.year, validation.data.month);
-    await shareDriveFolderWithUser(folder.clientFolderId, client.userEmail);
     if (client.driveFolderId !== folder.clientFolderId) await saveClientDriveFolder(clientId, folder.clientFolderId);
     const filename = validation.data.file.name.replace(/[\\/]/g, "-").slice(0, 255);
     const bytes = new Uint8Array(await validation.data.file.arrayBuffer());
     const uploaded = await uploadDriveFile(folder.id, filename, validation.data.file.type || payrollMimeType(validation.data.fileType), bytes);
     createdFileId = uploaded.id;
     await createPayrollFile({ clientId, fileName: uploaded.name, fileType: validation.data.fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
+    try {
+      await shareDriveFolderWithUser(folder.clientFolderId, client.userEmail);
+    } catch (error) {
+      sharingPending = true;
+      console.warn(`[clients] Payroll uploaded, but Drive sharing failed: ${error instanceof GoogleDriveError ? error.message : "unknown error"}`);
+    }
   } catch (error) {
     if (createdFileId) await deleteDriveFile(createdFileId).catch(() => undefined);
-    if (error instanceof GoogleDriveError) return { message: error.code === "CONFIG" ? "Configura Google Drive antes de cargar nóminas." : error.code === "FILE_EXISTS" ? "Ya existe un archivo con ese nombre en el periodo." : "No fue posible cargar o compartir el archivo en Google Drive." };
+    if (error instanceof GoogleDriveError) {
+      console.error(`[clients] Payroll Drive operation failed: ${error.message}`);
+      return { message: error.code === "CONFIG" ? "Configura Google Drive antes de cargar nóminas." : error.code === "FILE_EXISTS" ? "Ya existe un archivo con ese nombre en el periodo." : "No fue posible cargar el archivo en Google Drive." };
+    }
     console.error("[clients] Failed to upload payroll file.");
     return { message: "No fue posible guardar la nómina." };
   }
   revalidatePath(`/clientes/${clientId}`);
-  redirect(`/clientes/${clientId}?message=payroll-uploaded`);
+  redirect(`/clientes/${clientId}?message=${sharingPending ? "payroll-uploaded-sharing-pending" : "payroll-uploaded"}`);
 }
 
 export async function setPayrollStatusAction(formData: FormData): Promise<void> {
