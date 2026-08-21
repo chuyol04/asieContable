@@ -1,10 +1,12 @@
 import type { ClientFormValues, ClientInput, ClientStatusFilter } from "./types";
 
 type ClientValidation = { success: true; data: Omit<ClientInput, "firebaseUid"> } | { success: false; message: string; values: ClientFormValues };
-export type PayrollUpload = { file: File; fileType: "pdf" | "xls" | "xlsx"; month: number; year: number; payrollDate: string | null; notes: string | null };
+export type PayrollUpload = { files: Array<{ file: File; fileType: "pdf" | "xls" | "xlsx" }>; month: number; year: number; payrollDate: string | null; notes: string | null };
 type PayrollValidation = { success: true; data: PayrollUpload } | { success: false; message: string };
 
 export const MAX_PAYROLL_FILE_BYTES = 20 * 1024 * 1024;
+export const MAX_PAYROLL_BATCH_BYTES = 100 * 1024 * 1024;
+export const MAX_PAYROLL_FILES = 10;
 
 function text(formData: FormData, field: string): string {
   const value = formData.get(field);
@@ -51,21 +53,26 @@ export function validateClientForm(formData: FormData): ClientValidation {
 }
 
 export function validatePayrollUpload(formData: FormData): PayrollValidation {
-  const file = formData.get("payrollFile");
+  const values = formData.getAll("payrollFiles");
   const month = Number(text(formData, "periodMonth"));
   const year = Number(text(formData, "periodYear"));
   const payrollDateValue = text(formData, "payrollDate");
   const notes = text(formData, "notes");
-  if (!(file instanceof File) || file.size === 0) return { success: false, message: "Selecciona un archivo PDF, XLS o XLSX." };
-  const match = /\.([^.]+)$/.exec(file.name.toLowerCase());
-  const fileType = match?.[1];
-  if (fileType !== "pdf" && fileType !== "xls" && fileType !== "xlsx") return { success: false, message: "Solo se permiten archivos PDF, XLS y XLSX." };
-  if (file.size > MAX_PAYROLL_FILE_BYTES) return { success: false, message: "El archivo no puede exceder 20 MB." };
+  if (!values.length || values.some((value) => !(value instanceof File) || value.size === 0)) return { success: false, message: "Selecciona uno o varios archivos PDF, XLS o XLSX." };
+  if (values.length > MAX_PAYROLL_FILES) return { success: false, message: `Puedes cargar máximo ${MAX_PAYROLL_FILES} archivos a la vez.` };
+  const files = values.map((value) => {
+    const file = value as File;
+    const fileType = /\.([^.]+)$/.exec(file.name.toLowerCase())?.[1];
+    return { file, fileType };
+  });
+  if (files.some(({ fileType }) => fileType !== "pdf" && fileType !== "xls" && fileType !== "xlsx")) return { success: false, message: "Solo se permiten archivos PDF, XLS y XLSX." };
+  if (files.some(({ file }) => file.size > MAX_PAYROLL_FILE_BYTES)) return { success: false, message: "Cada archivo puede pesar máximo 20 MB." };
+  if (files.reduce((total, { file }) => total + file.size, 0) > MAX_PAYROLL_BATCH_BYTES) return { success: false, message: "La carga completa no puede exceder 100 MB." };
   if (!Number.isInteger(month) || month < 1 || month > 12) return { success: false, message: "Selecciona un mes válido." };
   if (!Number.isInteger(year) || year < 2000 || year > 2200) return { success: false, message: "Ingresa un año válido." };
   if (payrollDateValue && !validDate(payrollDateValue)) return { success: false, message: "La fecha de nómina no es válida." };
   if (notes.length > 5_000) return { success: false, message: "Las observaciones son demasiado largas." };
-  return { success: true, data: { file, fileType, month, year, payrollDate: payrollDateValue || null, notes: notes || null } };
+  return { success: true, data: { files: files as PayrollUpload["files"], month, year, payrollDate: payrollDateValue || null, notes: notes || null } };
 }
 
 export function parseClientId(value: unknown): number | null {

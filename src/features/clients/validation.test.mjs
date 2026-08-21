@@ -16,8 +16,24 @@ test("rechaza tipos de archivo distintos de PDF o Excel", () => {
   const form = new FormData();
   form.set("periodMonth", "8");
   form.set("periodYear", "2026");
-  form.set("payrollFile", new File(["texto"], "nomina.txt", { type: "text/plain" }));
+  form.set("payrollFiles", new File(["texto"], "nomina.txt", { type: "text/plain" }));
   assert.equal(validatePayrollUpload(form).success, false);
+});
+
+test("acepta varios archivos con la misma fecha y observación", () => {
+  const form = new FormData();
+  form.set("periodMonth", "8");
+  form.set("periodYear", "2026");
+  form.set("payrollDate", "2026-08-20");
+  form.set("notes", "Depósitos del mismo día");
+  form.append("payrollFiles", new File(["pdf"], "deposito-1.pdf", { type: "application/pdf" }));
+  form.append("payrollFiles", new File(["excel"], "deposito-2.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const result = validatePayrollUpload(form);
+  assert.equal(result.success, true);
+  if (result.success) {
+    assert.equal(result.data.files.length, 2);
+    assert.equal(result.data.notes, "Depósitos del mismo día");
+  }
 });
 
 test("normaliza los filtros del reporte de nóminas", () => {

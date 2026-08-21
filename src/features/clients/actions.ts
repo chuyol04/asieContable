@@ -87,23 +87,29 @@ export async function uploadPayrollAction(clientId: number, _state: PayrollFormS
   if (!validation.success) return { message: validation.message };
   const client = await getClient(clientId);
   if (!client || !client.isActive) return { message: "El cliente no existe o está inactivo." };
-  let createdFileId: string | null = null;
+  const created: Array<{ driveFileId: string; payrollFileId?: number }> = [];
   try {
     const folder = await ensurePayrollFolder(client.name, validation.data.year, validation.data.month);
     if (client.driveFolderId !== folder.clientFolderId) await saveClientDriveFolder(clientId, folder.clientFolderId);
-    const filename = validation.data.file.name.replace(/[\\/]/g, "-").slice(0, 255);
-    const bytes = new Uint8Array(await validation.data.file.arrayBuffer());
-    const uploaded = await uploadDriveFile(folder.id, filename, validation.data.file.type || payrollMimeType(validation.data.fileType), bytes);
-    createdFileId = uploaded.id;
-    await createPayrollFile({ clientId, fileName: uploaded.name, fileType: validation.data.fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
+    for (const { file, fileType } of validation.data.files) {
+      const filename = file.name.replace(/[\\/]/g, "-").slice(0, 255);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const uploaded = await uploadDriveFile(folder.id, filename, file.type || payrollMimeType(fileType), bytes);
+      const entry: { driveFileId: string; payrollFileId?: number } = { driveFileId: uploaded.id };
+      created.push(entry);
+      entry.payrollFileId = await createPayrollFile({ clientId, fileName: uploaded.name, fileType, driveFileId: uploaded.id, driveUrl: driveFileUrl(uploaded), payrollDate: validation.data.payrollDate, periodMonth: validation.data.month, periodYear: validation.data.year, notes: validation.data.notes });
+    }
   } catch (error) {
-    if (createdFileId) await deleteDriveFile(createdFileId).catch(() => undefined);
+    await Promise.all(created.map(async ({ driveFileId, payrollFileId }) => {
+      await deleteDriveFile(driveFileId).catch(() => undefined);
+      if (payrollFileId) await deletePayrollFile(clientId, payrollFileId).catch(() => undefined);
+    }));
     if (error instanceof GoogleDriveError) {
       console.error(`[clients] Payroll Drive operation failed: ${error.message}`);
-      return { message: error.code === "CONFIG" ? "Configura Google Drive antes de cargar nóminas." : error.code === "FILE_EXISTS" ? "Ya existe un archivo con ese nombre en el periodo." : "No fue posible cargar el archivo en Google Drive." };
+      return { message: error.code === "CONFIG" ? "Configura Google Drive antes de cargar nóminas." : error.code === "FILE_EXISTS" ? "Uno de los archivos ya existe con el mismo nombre en el periodo. No se guardó el lote." : "No fue posible cargar los archivos en Google Drive." };
     }
     console.error("[clients] Failed to upload payroll file.");
-    return { message: "No fue posible guardar la nómina." };
+    return { message: "No fue posible guardar el lote de nóminas." };
   }
   revalidatePath(`/clientes/${clientId}`);
   redirect(`/clientes/${clientId}?message=payroll-uploaded`);
