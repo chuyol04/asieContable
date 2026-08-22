@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import phantoLogo from "../../docs/referencias-ui/PHANTOLOGO.png";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "ASIE Contable",
-  title: "ASIE Contable | Gestión Administrativa y Financiera",
-  description: "Sistema de gestión administrativa, contable y financiera de ASIE.",
+  applicationName: "Phanto Contable",
+  title: "Phanto Contable | Gestión Administrativa y Financiera",
+  description: "Sistema de gestión administrativa, contable y financiera de PHANTO.",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: "/icon.svg",
+    icon: phantoLogo.src,
+    shortcut: phantoLogo.src,
   },
 };
 

@@ -17,7 +17,7 @@ export default async function Home() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Inicio / Resumen</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Resumen del sistema</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Estado técnico y accesos disponibles para la operación actual de ASIEContable.
+            Estado técnico y accesos disponibles para la operación actual de Phanto Contable.
           </p>
         </div>
 

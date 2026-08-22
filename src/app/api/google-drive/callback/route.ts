@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await saveDriveAuthorization(code);
-    const response = new NextResponse("Google Drive quedó conectado. Ya puedes cerrar esta pestaña y volver a ASIEContable.", {
+    const response = new NextResponse("Google Drive quedó conectado. Ya puedes cerrar esta pestaña y volver a Phanto Contable.", {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
     response.cookies.delete("asie_drive_oauth_state");

@@ -1,7 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 
-import asieLogo from "../../docs/referencias-ui/AsieDegradado.png";
+import { BrandLogo } from "@/components/brand-logo";
 import { logoutAction } from "@/features/auth/actions";
 import { requireAdminUser } from "@/features/auth/authorization";
 import { CompanySelector } from "@/features/company-context/components/company-selector";
@@ -62,7 +61,7 @@ export async function AppShell({
           <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <div className="md:hidden"><Brand compact /></div>
             <div className="hidden md:block">
-              <p className="text-xs text-slate-400">ASIEContable</p>
+              <p className="text-xs text-slate-400">Phanto Contable</p>
               <p className="text-sm font-semibold text-slate-800">{title}</p>
             </div>
             <div className="flex min-w-0 items-center gap-2"><CompanySelector activeCompanyId={activeCompany?.id ?? null} companies={companies} /><div className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:flex"><span className="h-2 w-2 rounded-full bg-emerald-500" />Entorno local</div><form action={logoutAction}><button className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" type="submit">Salir</button></form></div>
@@ -82,9 +81,7 @@ export async function AppShell({
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link className={`flex items-center gap-3 ${compact ? "" : "h-16 border-b border-slate-200 px-5"}`} href="/">
-      <span className={`relative block shrink-0 overflow-hidden ${compact ? "h-8 w-20" : "h-11 w-28"}`}>
-        <Image alt="ASIE" className="absolute left-0 top-1/2 h-auto w-full -translate-y-1/2" priority src={asieLogo} />
-      </span>
+      <BrandLogo className={compact ? "h-8 w-20" : "h-11 w-28"} />
       <span className={`font-semibold tracking-tight text-cyan-700 ${compact ? "hidden" : "text-sm"}`}>Contable</span>
     </Link>
   );
