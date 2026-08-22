@@ -18,3 +18,9 @@ export function safeInternalPath(value: unknown): string {
     return "/";
   }
 }
+
+export function isClientAllowedPath(pathname: string): boolean {
+  return pathname === "/mis-nominas"
+    || pathname.startsWith("/mis-nominas/")
+    || /^\/api\/nominas\/[1-9]\d*\/download$/.test(pathname);
+}

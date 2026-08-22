@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { firebaseAdminAuth } from "@/features/auth/firebase-admin";
+import { isClientAllowedPath } from "@/features/auth/security";
 import { SESSION_COOKIE } from "@/features/auth/session";
 
 const publicPaths = new Set(["/login", "/api/auth/session", "/api/health"]);
@@ -12,7 +13,7 @@ export async function proxy(request: NextRequest) {
 
   try {
     const user = await firebaseAdminAuth.verifySessionCookie(session, true);
-    const clientArea = request.nextUrl.pathname === "/mis-nominas" || request.nextUrl.pathname.startsWith("/mis-nominas/");
+    const clientArea = isClientAllowedPath(request.nextUrl.pathname);
     if (user.role === "client") {
       if (isLogin || (!clientArea && !publicPaths.has(request.nextUrl.pathname))) return NextResponse.redirect(new URL("/mis-nominas", request.url));
       return NextResponse.next();

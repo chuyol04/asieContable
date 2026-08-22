@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isTrustedOrigin, safeInternalPath } from "./security.ts";
+import { isClientAllowedPath, isTrustedOrigin, safeInternalPath } from "./security.ts";
 
 test("solo acepta solicitudes del mismo origen", () => {
   assert.equal(isTrustedOrigin("http://localhost:3001", "http://localhost:3001"), true);
@@ -15,4 +15,12 @@ test("solo permite rutas internas para redirecciones", () => {
   assert.equal(safeInternalPath("https://sitio-malicioso.example"), "/");
   assert.equal(safeInternalPath("//sitio-malicioso.example"), "/");
   assert.equal(safeInternalPath("/\\sitio-malicioso.example"), "/");
+});
+
+test("el cliente solo puede abrir su portal y la descarga protegida de nominas", () => {
+  assert.equal(isClientAllowedPath("/mis-nominas"), true);
+  assert.equal(isClientAllowedPath("/api/nominas/12/download"), true);
+  assert.equal(isClientAllowedPath("/api/nominas/12/delete"), false);
+  assert.equal(isClientAllowedPath("/api/nominas/otro/download"), false);
+  assert.equal(isClientAllowedPath("/clientes"), false);
 });
